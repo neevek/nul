@@ -35,12 +35,12 @@ namespace nul {
               break;
             }
 
-            auto lenData = data_.data();
+            auto d = data_.data();
             int dlBytes = dataLengthBytes_;
             while (--dlBytes >= 0) {
               auto shift = 8 * dlBytes;
-              dataLen_ += ((*lenData) << shift) & (0xff << shift);
-              ++lenData;
+              dataLen_ += (*d << shift) & (0xff << shift);
+              ++d;
             }
           }
 
@@ -73,6 +73,10 @@ namespace nul {
 
       std::size_t getBufferCount() const {
         return q_.size();
+      }
+
+      bool empty() const {
+        return q_.empty();
       }
 
       void clear() {
