@@ -14,7 +14,7 @@
 namespace nul {
   class BufferPool {
     public:
-      BufferPool(int maxBufferSize, int maxBufferCount) :
+      BufferPool(std::size_t maxBufferSize, std::size_t maxBufferCount) :
         maxBufferSize_(maxBufferSize), maxBufferCount_(maxBufferCount) {
         }
       virtual ~BufferPool() = default;
@@ -50,8 +50,8 @@ namespace nul {
 
     private:
       std::deque<std::unique_ptr<Buffer>> freeBuffers_;
-      int maxBufferSize_;
-      int maxBufferCount_;
+      std::size_t maxBufferSize_;
+      std::size_t maxBufferCount_;
   };
 } /* end of namspace: nul */
 
