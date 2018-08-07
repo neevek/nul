@@ -9,6 +9,7 @@
 #include "buffer.hpp"
 #include <deque>
 #include <memory>
+#include <algorithm>
 
 namespace nul {
   class BufferPool {
