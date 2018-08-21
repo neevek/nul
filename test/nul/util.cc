@@ -65,3 +65,33 @@ TEST(StringUtil, trim) {
   ASSERT_STREQ("", StringUtil::trim(" ").c_str());
   ASSERT_STREQ("", StringUtil::trim("\r\n \r\n").c_str());
 }
+
+TEST(NetUtil, CheckIPv4) {
+  ASSERT_TRUE(NetUtil::isIPv4("128.1.0.1"));
+  ASSERT_TRUE(NetUtil::isIPv4("0.0.0.0"));
+  ASSERT_TRUE(NetUtil::isIPv4("10.0.0.1"));
+  ASSERT_TRUE(NetUtil::isIPv4("0.120.0.1"));
+  ASSERT_TRUE(NetUtil::isIPv4("0.250.00000.1"));
+  ASSERT_TRUE(NetUtil::isIPv4("223.255.254.254"));
+  ASSERT_FALSE(NetUtil::isIPv4("999.12345.0.0001"));
+  ASSERT_FALSE(NetUtil::isIPv4("1.2.0.331"));
+  ASSERT_FALSE(NetUtil::isIPv4("12.0.331"));
+  ASSERT_FALSE(NetUtil::isIPv4("12.12.1."));
+  ASSERT_FALSE(NetUtil::isIPv4(".12.12.1"));
+}
+
+TEST(NetUtil, CheckIPv6) {
+  ASSERT_TRUE(NetUtil::isIPv6("1050:0:0:0:5:600:300c:326b"));
+  ASSERT_FALSE(NetUtil::isIPv6("1050!0!0+0-5@600$300c#326b"));
+  ASSERT_FALSE(NetUtil::isIPv6("1050:0:0:0:5:600:300c:326babcdef"));
+  ASSERT_FALSE(NetUtil::isIPv6("1050:::600:5:1000::"));
+  ASSERT_TRUE(NetUtil::isIPv6("fe80::202:b3ff:fe1e:8329"));
+  ASSERT_FALSE(NetUtil::isIPv6("fe80::202:b3ff::fe1e:8329"));
+  ASSERT_FALSE(NetUtil::isIPv6("fe80:0000:0000:0000:0202:b3ff:fe1e:8329:abcd"));
+  ASSERT_TRUE(NetUtil::isIPv6("::1"));
+  ASSERT_TRUE(NetUtil::isIPv6("1::"));
+  ASSERT_TRUE(NetUtil::isIPv6("1:f3::"));
+  ASSERT_TRUE(NetUtil::isIPv6("::1:f3"));
+  ASSERT_TRUE(NetUtil::isIPv6("::"));
+  ASSERT_FALSE(NetUtil::isIPv6(":"));
+}

@@ -58,5 +58,5 @@ macro(ADD_NUL_TEST TEST_NAME TEST_SOURCE)
 endmacro()
 
 ADD_NUL_TEST(xbuffer nul/xbuffer.cc)
-ADD_NUL_TEST(stringutil nul/string_util.cc)
+ADD_NUL_TEST(util nul/util.cc)
 ADD_NUL_TEST(uri nul/uri.cc)

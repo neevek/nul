@@ -144,12 +144,12 @@ namespace nul {
       }
 
       int scan(
-        const std::string &strUri, const char *stop_chars, int start, int end) {
+        const std::string &strUri, const char *stopChars, int start, int end) {
 
-        int len = strlen(stop_chars); 
+        int len = strlen(stopChars); 
         while (start < end) {
           for (int i = 0; i < len; ++i) {
-            if (strUri[start] == stop_chars[i]) {
+            if (strUri[start] == stopChars[i]) {
               return start;
             }
           }
@@ -161,9 +161,9 @@ namespace nul {
       }
 
       int scan(
-        const std::string &strUri, char stop_char, int start, int end) {
+        const std::string &strUri, char stopChar, int start, int end) {
         while (start < end) {
-          if (strUri[start] == stop_char) {
+          if (strUri[start] == stopChar) {
             return start;
           }
 

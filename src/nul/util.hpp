@@ -86,6 +86,87 @@ namespace nul {
       }
   };
 
+  class NetUtil {
+    public:
+      static bool isIPv4(const std::string &s) {
+        if (s.empty()) {
+          return false;
+        }
+
+        auto sum = 0;
+        auto dotCount = 0;
+        auto lastChar = '\0';
+        for (int i = 0; i < s.length(); ++i) {
+          auto &c = s[i];
+          if (c == '.') {
+            if (lastChar == '\0' || lastChar == '.' || ++dotCount > 3) {
+              return false;
+            }
+            sum = 0;
+
+          } else {
+            if (c < '0' || c > '9') {
+              return false;
+            }
+
+            sum = sum * 10 + (c - '0');
+            if (sum > 255) {
+              return false;
+            }
+          }
+
+          lastChar = c;
+        }
+        return dotCount == 3 && lastChar != '.';
+      }
+
+      static bool isIPv6(const std::string &s) {
+        if (s.empty()) {
+          return false;
+        }
+
+        auto charCountInEachGroup = 0;
+        auto colonCount = 0;
+        auto hasConsecutiveGroup = false;
+        auto lastChar = '\0';
+        for (int i = 0; i < s.length(); ++i) {
+          auto &c = s[i];
+
+          if (c == ':') {
+            if (++colonCount > 7) {
+              return false;
+            }
+            if (lastChar == ':') {
+              if (hasConsecutiveGroup) {
+                // each IPv6 address can only one consecutive group
+                return false;
+              }
+              hasConsecutiveGroup = true;
+            }
+            charCountInEachGroup = 0;
+
+          } else {
+            auto isValidIPv6Char =
+              (c >= '0' && c <= '9') ||
+              (c >= 'a' && c <= 'f') ||
+              (c >= 'A' && c <= 'F');
+            if (!isValidIPv6Char) {
+              return false;
+            }
+
+            // each chunk can at most have 4 chars 
+            if (++charCountInEachGroup > 4) {
+              return false;
+            }
+          }
+
+          lastChar = c;
+        }
+
+        return colonCount >= 2;
+      }
+  };
+
 } /* end of namspace: nul */
 
 #endif /* end of include guard: NUL_UTIL_H_ */
