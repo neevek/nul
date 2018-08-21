@@ -26,6 +26,32 @@ namespace nul {
         return s;
       }
 
+      static std::string trim(const std::string &s) {
+        if (s.empty()) {
+          return s;
+        }
+        std::string::size_type start;
+        for (start = 0; start < s.length(); ++start) {
+          if (!std::isspace(s[start])) {
+            break;
+          }
+        }
+        if (start == s.length()) {
+          return "";
+        }
+
+        std::string::size_type end;
+        for (end = s.length(); end > 0; --end) {
+          if (!std::isspace(s[end - 1])) {
+            break;
+          }
+        }
+        if (start == 0 && end == s.length() - 1) {
+          return s;
+        }
+        return s.substr(start, end - start);
+      }
+
       static bool split(
         const std::string &s, 
         const std::string &seprator,
