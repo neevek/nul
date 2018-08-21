@@ -26,7 +26,7 @@ namespace nul {
         return s;
       }
 
-      static void split(
+      static bool split(
         const std::string &s, 
         const std::string &seprator,
         std::function<bool(std::string::size_type index,
@@ -37,15 +37,16 @@ namespace nul {
         while ((pos1 = s.find(seprator, pos0)) != std::string::npos) {
           if (pos1 > pos0) {
             if (!visitor(index++, s.substr(pos0, pos1 - pos0))) {
-              return;
+              return false;
             }
           }
           pos0 = pos1 + seprator.length();
           pos1 = pos0;
         }
         if (pos0 < s.length()) {
-          visitor(index, s.substr(pos0));
+          return visitor(index, s.substr(pos0));
         }
+        return true;
       }
 
       static std::vector<std::string> split(
