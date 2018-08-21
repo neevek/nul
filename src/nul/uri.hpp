@@ -128,12 +128,12 @@ namespace nul {
         if (hasOpenBracket) {
           ++start;
         }
-        int host_end = hasOpenBracket ?
+        int hostEnd = hasOpenBracket ?
           scan(strUri, ']', start, end) :
           scan(strUri, ':', start, end);
-        if (host_end != -1) {
-          host_ = std::string{strUri, start, host_end - start};
-          start = host_end + 1;  // ignore ':'
+        if (hostEnd != -1) {
+          host_ = std::string{strUri, start, hostEnd - start};
+          start = hostEnd + 1;  // ignore ':'
           if (hasOpenBracket) {
             ++start;  // ignore ]
           }
@@ -185,13 +185,13 @@ namespace nul {
 
       bool regionMatches(
         const std::string &s, const char *region, int start) {
-        int region_len = strlen(region);
-        int s_size = s.size();
-        if (region_len > s_size) {
+        int regionLen = strlen(region);
+        int strSize = s.size();
+        if (regionLen > strSize) {
           return false;
         }
 
-        while (*region != '\0' && start < s_size) {
+        while (*region != '\0' && start < strSize) {
           if (*region != s[start]) {
             return false;
           }
