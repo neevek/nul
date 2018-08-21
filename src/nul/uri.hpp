@@ -123,10 +123,20 @@ namespace nul {
           start = userInfoEnd + 1;  // ignore '@'
         }
 
-        int host_end = scan(strUri, ':', start, end);
+        // brackets are used for IPv6
+        auto hasOpenBracket = start < end && strUri[start] == '[';
+        if (hasOpenBracket) {
+          ++start;
+        }
+        int host_end = hasOpenBracket ?
+          scan(strUri, ']', start, end) :
+          scan(strUri, ':', start, end);
         if (host_end != -1) {
           host_ = std::string{strUri, start, host_end - start};
           start = host_end + 1;  // ignore ':'
+          if (hasOpenBracket) {
+            ++start;  // ignore ]
+          }
 
           if (start < end) {
             for (int i = start; i < end; ++i) {

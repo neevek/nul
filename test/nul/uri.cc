@@ -70,4 +70,20 @@ TEST(URI, Test) {
   ASSERT_STREQ("/path/to/file//haha.txt", uri.getPath().c_str());
   ASSERT_STREQ("key=value", uri.getQueryStr().c_str());
   ASSERT_STREQ("hash", uri.getFragment().c_str());
+
+  uri = URI{};
+  ASSERT_TRUE(uri.parse("https://[fe::1234:34]:443/hello/world?key=value#hash"));
+  ASSERT_STREQ("fe::1234:34", uri.getHost().c_str());
+  ASSERT_EQ(443, uri.getPort());
+
+  uri = URI{};
+  ASSERT_TRUE(uri.parse("https://[fe::1234:34]/hello/world?key=value#hash"));
+  ASSERT_STREQ("fe::1234:34", uri.getHost().c_str());
+  ASSERT_EQ(0, uri.getPort());
+
+  uri = URI{};
+  ASSERT_TRUE(uri.parse("https://user@[fe::1234:34]/hello/world?key=value#hash"));
+  ASSERT_STREQ("user", uri.getUserInfo().c_str());
+  ASSERT_STREQ("fe::1234:34", uri.getHost().c_str());
+  ASSERT_EQ(0, uri.getPort());
 }
