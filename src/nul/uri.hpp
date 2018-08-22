@@ -1,11 +1,11 @@
 /*******************************************************************************
-**          File: strUri.hpp
+**          File: uri.hpp
 **        Author: neevek <i@neevek.net>.
 ** Creation Time: 2018-08-21 Tue 04:39 PM
-**   Description: URI 
+**   Description: URI
 *******************************************************************************/
 #ifndef NUL_URI_H_
-#define NUL_URI_H_ 
+#define NUL_URI_H_
 #include <string>
 #include "log.hpp"
 
@@ -19,8 +19,8 @@ namespace nul {
 
         strUri_ = strUri;
 
-        int start = 0;
-        int fragmentStart = scan(strUri, '#', start, strUri.length());
+        auto start = 0;
+        auto fragmentStart = scan(strUri, '#', start, strUri.length());
         if (fragmentStart != -1) {
           fragment_ = std::string(strUri, fragmentStart + 1);
 
@@ -28,7 +28,7 @@ namespace nul {
           fragmentStart = strUri.length();
         }
 
-        int schemeEnd = scan(strUri, ":/?", start, fragmentStart);
+        auto schemeEnd = scan(strUri, ":/?", start, fragmentStart);
         if (schemeEnd != -1 && strUri[schemeEnd] == ':') {
 
           bool isValidScheme = true;
@@ -38,7 +38,7 @@ namespace nul {
               isValidScheme = false;
               break;
             }
-          }    
+          }
 
           if (isValidScheme) {
             scheme_ = std::string(strUri, start, schemeEnd - start);
@@ -116,8 +116,7 @@ namespace nul {
     private:
       void parseAuthority(
         const std::string &strUri, std::size_t start, std::size_t end) {
-
-        int userInfoEnd = scan(strUri, '@', start, end);
+        auto userInfoEnd = scan(strUri, '@', start, end);
         if (userInfoEnd != -1) {
           userInfo_ = std::string{strUri, start, userInfoEnd - start};
           start = userInfoEnd + 1;  // ignore '@'
@@ -128,7 +127,7 @@ namespace nul {
         if (hasOpenBracket) {
           ++start;
         }
-        int hostEnd = hasOpenBracket ?
+        auto hostEnd = hasOpenBracket ?
           scan(strUri, ']', start, end) :
           scan(strUri, ':', start, end);
         if (hostEnd != -1) {
@@ -139,7 +138,7 @@ namespace nul {
           }
 
           if (start < end) {
-            for (int i = start; i < end; ++i) {
+            for (std::size_t i = start; i < end; ++i) {
               if (!isdigit(strUri[i])) {
                 return;
               }
@@ -154,11 +153,14 @@ namespace nul {
       }
 
       int scan(
-        const std::string &strUri, const char *stopChars, int start, int end) {
+        const std::string &strUri,
+        const char *stopChars,
+        std::size_t start,
+        std::size_t end) {
 
-        int len = strlen(stopChars); 
+        auto len = strlen(stopChars);
         while (start < end) {
-          for (int i = 0; i < len; ++i) {
+          for (std::size_t i = 0; i < len; ++i) {
             if (strUri[start] == stopChars[i]) {
               return start;
             }
@@ -171,7 +173,11 @@ namespace nul {
       }
 
       int scan(
-        const std::string &strUri, char stopChar, int start, int end) {
+        const std::string &strUri,
+        char stopChar,
+        int start,
+        int end) {
+
         while (start < end) {
           if (strUri[start] == stopChar) {
             return start;
@@ -184,9 +190,9 @@ namespace nul {
       }
 
       bool regionMatches(
-        const std::string &s, const char *region, int start) {
-        int regionLen = strlen(region);
-        int strSize = s.size();
+        const std::string &s, const char *region, std::size_t start) {
+        auto regionLen = strlen(region);
+        auto strSize = s.size();
         if (regionLen > strSize) {
           return false;
         }

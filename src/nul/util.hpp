@@ -2,7 +2,7 @@
 **          File: util.hpp
 **        Author: neevek <i@neevek.net>.
 ** Creation Time: 2018-08-02 Thu 09:52 AM
-**   Description: utilities 
+**   Description: utilities
 *******************************************************************************/
 #ifndef NUL_UTIL_H_
 #define NUL_UTIL_H_
@@ -53,7 +53,7 @@ namespace nul {
       }
 
       static bool split(
-        const std::string &s, 
+        const std::string &s,
         const std::string &seprator,
         std::function<bool(std::string::size_type index,
                            const std::string &part)> visitor) {
@@ -69,6 +69,7 @@ namespace nul {
           pos0 = pos1 + seprator.length();
           pos1 = pos0;
         }
+
         if (pos0 < s.length()) {
           return visitor(index, s.substr(pos0));
         }
@@ -96,7 +97,7 @@ namespace nul {
         auto sum = 0;
         auto dotCount = 0;
         auto lastChar = '\0';
-        for (int i = 0; i < s.length(); ++i) {
+        for (std::size_t i = 0; i < s.length(); ++i) {
           auto &c = s[i];
           if (c == '.') {
             if (lastChar == '\0' || lastChar == '.' || ++dotCount > 3) {
@@ -129,7 +130,7 @@ namespace nul {
         auto colonCount = 0;
         auto hasConsecutiveGroup = false;
         auto lastChar = '\0';
-        for (int i = 0; i < s.length(); ++i) {
+        for (std::size_t i = 0; i < s.length(); ++i) {
           auto &c = s[i];
 
           if (c == ':') {
@@ -154,7 +155,7 @@ namespace nul {
               return false;
             }
 
-            // each chunk can at most have 4 chars 
+            // each chunk can at most have 4 chars
             if (++charCountInEachGroup > 4) {
               return false;
             }
