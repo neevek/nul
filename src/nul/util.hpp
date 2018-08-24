@@ -11,6 +11,7 @@
 #include <functional>
 #include <algorithm>
 #include <vector>
+#include "log.hpp"
 
 namespace nul {
 
@@ -134,7 +135,8 @@ namespace nul {
           auto &c = s[i];
 
           if (c == ':') {
-            if (++colonCount > 7) {
+            if (++colonCount > 7 &&
+                (s[0] != ':' && s[s.length() - 1] != ':')) {
               return false;
             }
             if (lastChar == ':') {
@@ -155,7 +157,7 @@ namespace nul {
               return false;
             }
 
-            // each chunk can at most have 4 chars
+            // each group can at most have 4 chars
             if (++charCountInEachGroup > 4) {
               return false;
             }
@@ -165,6 +167,82 @@ namespace nul {
         }
 
         return colonCount >= 2;
+      }
+
+      static std::string ipToHex(const std::string &ip) {
+        return ip;
+      }
+
+      /**
+       * return original string if it is not an IPv6 address
+       */
+      static std::string expandIPv6(const std::string &s) {
+        if (!isIPv6(s)) {
+          return s;
+        }
+
+        auto result = std::string(4 * 8 + 7, '\0');
+        result.clear();
+
+        auto colons = 0;
+        for (auto &c : s) {
+          if (c == ':') {
+            ++colons;
+          }
+        }
+
+        auto groupStart = 0;
+
+        auto slen = s.length();
+        for (std::size_t i = 0; i < slen; ++i) {
+          auto nextIndex = i + 1;
+
+          if (s[i] == ':' || nextIndex == slen) {
+            auto glen = i - groupStart;
+            // if we reach the end, and the current char is not ':', then
+            // the last char SHOULDN'T be ':', so increment 'glen' by 1 to
+            // account for the last char
+            if (s[i] != ':' && nextIndex == slen) {
+              ++glen;
+            }
+
+            if (glen > 0) {
+              if (groupStart > 0) {
+                result.append(1, ':');
+              }
+              if (glen < 4) {
+                result.append(4 - glen, '0');
+              }
+              result.append(s, groupStart, glen);
+
+              groupStart = nextIndex;
+
+            } else {
+              ++groupStart;
+            }
+
+            if (nextIndex == slen && s[i] == ':') {
+              result.append(":0000", 5);
+
+            } else if (nextIndex < slen && s[nextIndex] == ':') {
+              // glen=0 when consecutive groups is at the leading of the string
+              if (glen == 0) {
+                --colons;
+              }
+
+              auto groupsToAppend = 8 - colons;
+              for (std::size_t j = 0; j < groupsToAppend; ++j) {
+                if (result.length() > 0) {
+                  result.append(1, ':');
+                }
+                result.append("0000", 4);
+              }
+
+            }
+          }
+        }
+
+        return result;
       }
   };
 
