@@ -176,8 +176,11 @@ namespace nul {
       /**
        * return original string if it is not an IPv6 address
        */
-      static std::string expandIPv6(const std::string &s) {
+      static std::string expandIPv6(const std::string &s, bool *ret = nullptr) {
         if (!isIPv6(s)) {
+          if (ret) {
+            *ret = false;
+          }
           return s;
         }
 
@@ -242,7 +245,63 @@ namespace nul {
           }
         }
 
+        if (ret) {
+          *ret = true;
+        }
         return result;
+      }
+
+      static bool ipv4ToBinary(const std::string &ip, char ipv4Bin[4]) {
+        if (!isIPv4(ip)) {
+          return false;
+        }
+
+        std::sscanf(
+          "%03d.%03d.%03d.%03d",
+          &ipv4Bin[0], &ipv4Bin[1], &ipv4Bin[2], &ipv4Bin[3]);
+        return true;
+      }
+
+      static bool ipv6ToBinary(const std::string &ip, char ipv6Bin[16]) {
+        bool ret = false;
+        auto expandedIp = expandIPv6(ip, &ret);
+        if (!ret) {
+          return false;
+        }
+
+        std::sscanf(
+          "%02x%02x%02x%02x:"
+          "%02x%02x%02x%02x:"
+          "%02x%02x%02x%02x:"
+          "%02x%02x%02x%02x:"
+          "%02x%02x%02x%02x:"
+          "%02x%02x%02x%02x:"
+          "%02x%02x%02x%02x:"
+          "%02x%02x%02x%02x",
+          &ipv6Bin[0], &ipv6Bin[1], &ipv6Bin[2], &ipv6Bin[3],
+          &ipv6Bin[4], &ipv6Bin[5], &ipv6Bin[6], &ipv6Bin[7],
+          &ipv6Bin[8], &ipv6Bin[9], &ipv6Bin[10], &ipv6Bin[11],
+          &ipv6Bin[12], &ipv6Bin[13], &ipv6Bin[14], &ipv6Bin[15]);
+        return true;
+      }
+
+      static bool maskIPv4(const char *ip, const char *subnet) {
+        return maskIP(ip, subnet, 4);
+      }
+
+      static bool maskIPv6(const char *ip, const char *subnet) {
+        return maskIP(ip, subnet, 16);
+      }
+
+    private:
+      static bool maskIP(const char *ip, const char *subnet, int len) {
+        for (int i = 0; i < len; ++i) {
+          char c = *(subnet + i);
+          if ((c & ip[0]) != c) {
+            return false;
+          }
+        }
+        return true;
       }
   };
 
