@@ -234,7 +234,7 @@ namespace nul {
               }
 
               auto groupsToAppend = 8 - colons;
-              for (std::size_t j = 0; j < groupsToAppend; ++j) {
+              for (auto j = 0; j < groupsToAppend; ++j) {
                 if (result.length() > 0) {
                   result.append(1, ':');
                 }
