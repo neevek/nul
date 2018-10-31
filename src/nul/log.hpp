@@ -109,6 +109,8 @@ inline static const char *log_prio_str_(int prio) {
 #define LOG_INFO
 #define LOG_WARN
 #define LOG_ERROR
+
+#define LOG_LEVEL LOG_LEVEL_VERBOSE 
 #else
 #define LOG_V(fmt, ...)
 #endif
@@ -118,6 +120,9 @@ inline static const char *log_prio_str_(int prio) {
 #define LOG_INFO
 #define LOG_WARN
 #define LOG_ERROR
+
+#undef LOG_LEVEL
+#define LOG_LEVEL LOG_LEVEL_VERBOSE 
 #else
 #define LOG_D(fmt, ...)
 #endif
@@ -126,6 +131,9 @@ inline static const char *log_prio_str_(int prio) {
 #define LOG_I(fmt, ...) DO_LOG_(LOG_LEVEL_INFO, KBLU, fmt, ##__VA_ARGS__)
 #define LOG_WARN
 #define LOG_ERROR
+
+#undef LOG_LEVEL
+#define LOG_LEVEL LOG_LEVEL_INFO
 #else
 #define LOG_I(fmt, ...)
 #endif
@@ -133,14 +141,24 @@ inline static const char *log_prio_str_(int prio) {
 #if defined(LOG_WARN)
 #define LOG_W(fmt, ...) DO_LOG_(LOG_LEVEL_WARN, KYEL, fmt, ##__VA_ARGS__)
 #define LOG_ERROR
+
+#undef LOG_LEVEL
+#define LOG_LEVEL LOG_LEVEL_WARN
 #else
 #define LOG_W(fmt, ...)
 #endif
 
 #if defined(LOG_ERROR)
 #define LOG_E(fmt, ...) DO_LOG_(LOG_LEVEL_ERROR, KRED, fmt, ##__VA_ARGS__)
+
+#undef LOG_LEVEL
+#define LOG_LEVEL LOG_LEVEL_ERROR
 #else
 #define LOG_E(fmt, ...)
+#endif
+
+#ifndef LOG_LEVEL
+#define LOG_LEVEL 7
 #endif
 
 #ifdef __cplusplus
