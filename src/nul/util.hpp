@@ -90,30 +90,48 @@ namespace nul {
 
   class NetUtil {
     public:
-      static bool isIPv4(const std::string &s) {
-        if (s.empty()) {
+      // e.g. 192.168.22.31, 192.168.22.0/24
+      static bool isIPv4(const std::string &s, bool hasMask = false) {
+        if (s.empty() || s.length() > 18) {
           return false;
         }
 
         auto sum = 0;
         auto dotCount = 0;
         auto lastChar = '\0';
+        auto eatingMask = false;
+        auto maskValue = 0;
         for (std::size_t i = 0; i < s.length(); ++i) {
           auto &c = s[i];
-          if (c == '.') {
+          if (eatingMask) {
+            if (c < '0' && c > '9') {
+              LOG_E("invalid mask");
+              return false;
+            }
+            maskValue = maskValue * 10 + (c - '0');
+            if (maskValue > 32) {
+              return false;
+            }
+
+          } else if (c == '.') {
             if (lastChar == '\0' || lastChar == '.' || ++dotCount > 3) {
               return false;
             }
             sum = 0;
 
           } else {
-            if (c < '0' || c > '9') {
-              return false;
-            }
+            if (hasMask && c == '/' && dotCount == 3 && lastChar != '.') {
+              eatingMask = true;
 
-            sum = sum * 10 + (c - '0');
-            if (sum > 255) {
-              return false;
+            } else {
+              if (c < '0' || c > '9') {
+                return false;
+              }
+
+              sum = sum * 10 + (c - '0');
+              if (sum > 255) {
+                return false;
+              }
             }
           }
 
@@ -122,8 +140,8 @@ namespace nul {
         return dotCount == 3 && lastChar != '.';
       }
 
-      static bool isIPv6(const std::string &s) {
-        if (s.empty()) {
+      static bool isIPv6(const std::string &s, bool hasMask = false) {
+        if (s.empty() || s.length() > 43) {
           return false;
         }
 
@@ -131,17 +149,28 @@ namespace nul {
         auto colonCount = 0;
         auto hasConsecutiveGroup = false;
         auto lastChar = '\0';
+        auto eatingMask = false;
+        auto maskValue = 0;
         for (std::size_t i = 0; i < s.length(); ++i) {
           auto &c = s[i];
+          if (eatingMask) {
+            if (c < '0' || c > '9') {
+              LOG_E("invalid mask");
+              return false;
+            }
+            maskValue = maskValue * 10 + (c - '0');
+            if (maskValue > 128) {
+              return false;
+            }
 
-          if (c == ':') {
+          } else if (c == ':') {
             if (++colonCount > 7 &&
                 (s[0] != ':' && s[s.length() - 1] != ':')) {
               return false;
             }
             if (lastChar == ':') {
               if (hasConsecutiveGroup) {
-                // each IPv6 address can only one consecutive group
+                // each IPv6 address can only have one consecutive group
                 return false;
               }
               hasConsecutiveGroup = true;
@@ -149,17 +178,23 @@ namespace nul {
             charCountInEachGroup = 0;
 
           } else {
-            auto isValidIPv6Char =
-              (c >= '0' && c <= '9') ||
-              (c >= 'a' && c <= 'f') ||
-              (c >= 'A' && c <= 'F');
-            if (!isValidIPv6Char) {
-              return false;
-            }
 
-            // each group can at most have 4 chars
-            if (++charCountInEachGroup > 4) {
-              return false;
+            if (hasMask && c == '/' && (colonCount >= 7 || hasConsecutiveGroup)) {
+              eatingMask = true;
+
+            } else {
+              auto isValidIPv6Char =
+                (c >= '0' && c <= '9') ||
+                (c >= 'a' && c <= 'f') ||
+                (c >= 'A' && c <= 'F');
+              if (!isValidIPv6Char) {
+                return false;
+              }
+
+              // each group can at most have 4 chars
+              if (++charCountInEachGroup > 4) {
+                return false;
+              }
             }
           }
 
@@ -176,19 +211,20 @@ namespace nul {
       /**
        * return original string if it is not an IPv6 address
        */
-      static std::string expandIPv6(const std::string &s, bool *ret = nullptr) {
-        if (!isIPv6(s)) {
+      static std::string expandIPv6(const std::string &ip, bool *ret = nullptr) {
+        auto slashPos = ip.rfind("/");
+        if (!isIPv6(ip, slashPos != std::string::npos)) {
           if (ret) {
             *ret = false;
           }
-          return s;
+          return ip;
         }
 
         auto result = std::string(4 * 8 + 7, '\0');
         result.clear();
 
         auto colons = 0;
-        for (auto &c : s) {
+        for (auto &c : ip) {
           if (c == ':') {
             ++colons;
           }
@@ -196,16 +232,16 @@ namespace nul {
 
         auto groupStart = 0;
 
-        auto slen = s.length();
+        auto slen = slashPos != std::string::npos ? slashPos : ip.length();
         for (std::size_t i = 0; i < slen; ++i) {
           auto nextIndex = i + 1;
 
-          if (s[i] == ':' || nextIndex == slen) {
+          if (ip[i] == ':' || nextIndex == slen) {
             auto glen = i - groupStart;
             // if we reach the end, and the current char is not ':', then
             // the last char SHOULDN'T be ':', so increment 'glen' by 1 to
             // account for the last char
-            if (s[i] != ':' && nextIndex == slen) {
+            if (ip[i] != ':' && nextIndex == slen) {
               ++glen;
             }
 
@@ -216,7 +252,7 @@ namespace nul {
               if (glen < 4) {
                 result.append(4 - glen, '0');
               }
-              result.append(s, groupStart, glen);
+              result.append(ip, groupStart, glen);
 
               groupStart = nextIndex;
 
@@ -224,10 +260,10 @@ namespace nul {
               ++groupStart;
             }
 
-            if (nextIndex == slen && s[i] == ':') {
+            if (nextIndex == slen && ip[i] == ':') {
               result.append(":0000", 5);
 
-            } else if (nextIndex < slen && s[nextIndex] == ':') {
+            } else if (nextIndex < slen && ip[nextIndex] == ':') {
               // glen=0 when consecutive groups is at the leading of the string
               if (glen == 0) {
                 --colons;
@@ -248,6 +284,10 @@ namespace nul {
         if (ret) {
           *ret = true;
         }
+
+        if (slashPos != std::string::npos) {
+          result.append(ip.substr(slashPos));
+        }
         return result;
       }
 
@@ -258,8 +298,21 @@ namespace nul {
 
         std::sscanf(
           ip.c_str(),
-          "%03" SCNu8 ".%03" SCNu8 ".%03" SCNu8 ".%03" SCNu8 ,
+          "%03" SCNu8 ".%03" SCNu8 ".%03" SCNu8 ".%03" SCNu8,
           &ipv4Bin[0], &ipv4Bin[1], &ipv4Bin[2], &ipv4Bin[3]);
+        return true;
+      }
+
+      static bool ipv4ToBinary(
+        const std::string &ipWithMask, uint8_t ipv4Bin[4], /*out*/ int &mask) {
+        if (!isIPv4(ipWithMask, true)) {
+          return false;
+        }
+
+        std::sscanf(
+          ipWithMask.c_str(),
+          "%03" SCNu8 ".%03" SCNu8 ".%03" SCNu8 ".%03" SCNu8  "/%2d",
+          &ipv4Bin[0], &ipv4Bin[1], &ipv4Bin[2], &ipv4Bin[3], &mask);
         return true;
       }
 
@@ -283,18 +336,75 @@ namespace nul {
         return true;
       }
 
-      static bool ipv4IsSameSubnet(
-        const uint8_t *ip, const uint8_t *subnet, int prefix) {
-        return ipIsSameSubnet(ip, subnet, 4, prefix);
+      static bool ipv6ToBinary(
+        const std::string &ipWithMask, uint8_t ipv6Bin[16], /*out*/int &mask) {
+        bool ret = false;
+        auto expandedIp = expandIPv6(ipWithMask, &ret);
+        if (!ret) {
+          return false;
+        }
+
+        std::sscanf(
+          expandedIp.c_str(),
+          "%2" SCNx8 "%2" SCNx8 ":%2" SCNx8 "%2" SCNx8 ":"
+          "%2" SCNx8 "%2" SCNx8 ":%2" SCNx8 "%2" SCNx8 ":"
+          "%2" SCNx8 "%2" SCNx8 ":%2" SCNx8 "%2" SCNx8 ":"
+          "%2" SCNx8 "%2" SCNx8 ":%2" SCNx8 "%2" SCNx8 "/%2d",
+          &ipv6Bin[0], &ipv6Bin[1], &ipv6Bin[2], &ipv6Bin[3],
+          &ipv6Bin[4], &ipv6Bin[5], &ipv6Bin[6], &ipv6Bin[7],
+          &ipv6Bin[8], &ipv6Bin[9], &ipv6Bin[10], &ipv6Bin[11],
+          &ipv6Bin[12], &ipv6Bin[13], &ipv6Bin[14], &ipv6Bin[15], &mask);
+        return true;
       }
 
-      static bool ipv6IsSameSubnet(
+      // e.g. ip = 192.168.23.44, ipWithMask = 192.168.23.0/24
+      static bool ipv4IsInSubnet(
+        const std::string &ip, const std::string &ipWithMask) {
+        uint8_t ipv4Bin[4];
+        if (!ipv4ToBinary(ip, ipv4Bin)) {
+          return false;
+        }
+
+        uint8_t subnet[4];
+        int mask = 32;
+        if (!ipv4ToBinary(ipWithMask, subnet, mask)) {
+          return false;
+        }
+
+        return ipv4IsInSubnet(ipv4Bin, subnet, mask);
+      }
+
+      // e.g. ip = ff::1, ipWithMask = ff::1/64
+      static bool ipv6IsInSubnet(
+        const std::string &ip, const std::string &ipWithMask) {
+        uint8_t ipv6Bin[16];
+        if (!ipv6ToBinary(ip, ipv6Bin)) {
+          return false;
+        }
+
+        uint8_t subnet[16];
+        int mask = 128;
+        if (!ipv6ToBinary(ipWithMask, subnet, mask)) {
+          return false;
+        }
+
+        return ipv6IsInSubnet(ipv6Bin, subnet, mask);
+      }
+
+      // 4-byte IPv4 address
+      static bool ipv4IsInSubnet(
         const uint8_t *ip, const uint8_t *subnet, int prefix) {
-        return ipIsSameSubnet(ip, subnet, 16, prefix);
+        return ipIsInSubnet(ip, subnet, 4, prefix);
+      }
+
+      // 16-byte IPv6 address
+      static bool ipv6IsInSubnet(
+        const uint8_t *ip, const uint8_t *subnet, int prefix) {
+        return ipIsInSubnet(ip, subnet, 16, prefix);
       }
 
     private:
-      static bool ipIsSameSubnet(
+      static bool ipIsInSubnet(
         const uint8_t *ip, const uint8_t *subnet, int len, int prefix) {
         for (int i = 0; i < len && prefix > 0; ++i) {
           auto shift = 8 - std::min(8, prefix);

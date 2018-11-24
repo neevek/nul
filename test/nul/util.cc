@@ -70,35 +70,35 @@ TEST(StringUtil, trim) {
 }
 
 TEST(NetUtil, isIPv4) {
-  ASSERT_TRUE(NetUtil::isIPv4("128.1.0.1"));
-  ASSERT_TRUE(NetUtil::isIPv4("0.0.0.0"));
-  ASSERT_TRUE(NetUtil::isIPv4("10.0.0.1"));
-  ASSERT_TRUE(NetUtil::isIPv4("0.120.0.1"));
-  ASSERT_TRUE(NetUtil::isIPv4("0.250.00000.1"));
-  ASSERT_TRUE(NetUtil::isIPv4("223.255.254.254"));
-  ASSERT_FALSE(NetUtil::isIPv4("999.12345.0.0001"));
-  ASSERT_FALSE(NetUtil::isIPv4("1.2.0.331"));
-  ASSERT_FALSE(NetUtil::isIPv4("12.0.331"));
-  ASSERT_FALSE(NetUtil::isIPv4("12.12.1."));
-  ASSERT_FALSE(NetUtil::isIPv4(".12.12.1"));
+  EXPECT_TRUE(NetUtil::isIPv4("128.1.0.1"));
+  EXPECT_TRUE(NetUtil::isIPv4("0.0.0.0"));
+  EXPECT_TRUE(NetUtil::isIPv4("10.0.0.1"));
+  EXPECT_TRUE(NetUtil::isIPv4("0.120.0.1"));
+  EXPECT_TRUE(NetUtil::isIPv4("0.250.00000.1"));
+  EXPECT_TRUE(NetUtil::isIPv4("223.255.254.254"));
+  EXPECT_FALSE(NetUtil::isIPv4("999.12345.0.0001"));
+  EXPECT_FALSE(NetUtil::isIPv4("1.2.0.331"));
+  EXPECT_FALSE(NetUtil::isIPv4("12.0.331"));
+  EXPECT_FALSE(NetUtil::isIPv4("12.12.1."));
+  EXPECT_FALSE(NetUtil::isIPv4(".12.12.1"));
 }
 
 TEST(NetUtil, isIPv6) {
-  ASSERT_TRUE(NetUtil::isIPv6("1050:0:0:0:5:600:300c:326b"));
-  ASSERT_FALSE(NetUtil::isIPv6("1050!0!0+0-5@600$300c#326b"));
-  ASSERT_FALSE(NetUtil::isIPv6("1050:0:0:0:5:600:300c:326babcdef"));
-  ASSERT_FALSE(NetUtil::isIPv6("1050:::600:5:1000::"));
-  ASSERT_TRUE(NetUtil::isIPv6("fe80::202:b3ff:fe1e:8329"));
-  ASSERT_FALSE(NetUtil::isIPv6("fe80::202:b3ff::fe1e:8329"));
-  ASSERT_FALSE(NetUtil::isIPv6("fe80:0000:0000:0000:0202:b3ff:fe1e:8329:abcd"));
-  ASSERT_TRUE(NetUtil::isIPv6("::1"));
-  ASSERT_TRUE(NetUtil::isIPv6("1::"));
-  ASSERT_TRUE(NetUtil::isIPv6("1:f3::"));
-  ASSERT_TRUE(NetUtil::isIPv6("::1:f3"));
-  ASSERT_TRUE(NetUtil::isIPv6("::"));
-  ASSERT_FALSE(NetUtil::isIPv6(":"));
-  ASSERT_TRUE(NetUtil::isIPv6("1:feee:0:0:0:0:0:1"));
-  ASSERT_TRUE(NetUtil::isIPv6("1:feee::1"));
+  EXPECT_TRUE(NetUtil::isIPv6("1050:0:0:0:5:600:300c:326b"));
+  EXPECT_FALSE(NetUtil::isIPv6("1050!0!0+0-5@600$300c#326b"));
+  EXPECT_FALSE(NetUtil::isIPv6("1050:0:0:0:5:600:300c:326babcdef"));
+  EXPECT_FALSE(NetUtil::isIPv6("1050:::600:5:1000::"));
+  EXPECT_TRUE(NetUtil::isIPv6("fe80::202:b3ff:fe1e:8329"));
+  EXPECT_FALSE(NetUtil::isIPv6("fe80::202:b3ff::fe1e:8329"));
+  EXPECT_FALSE(NetUtil::isIPv6("fe80:0000:0000:0000:0202:b3ff:fe1e:8329:abcd"));
+  EXPECT_TRUE(NetUtil::isIPv6("::1"));
+  EXPECT_TRUE(NetUtil::isIPv6("1::"));
+  EXPECT_TRUE(NetUtil::isIPv6("1:f3::"));
+  EXPECT_TRUE(NetUtil::isIPv6("::1:f3"));
+  EXPECT_TRUE(NetUtil::isIPv6("::"));
+  EXPECT_FALSE(NetUtil::isIPv6(":"));
+  EXPECT_TRUE(NetUtil::isIPv6("1:feee:0:0:0:0:0:1"));
+  EXPECT_TRUE(NetUtil::isIPv6("1:feee::1"));
 }
 
 TEST(NetUtil, expandIPv6) {
@@ -154,81 +154,106 @@ TEST(NetUtil, expandIPv6) {
 
 TEST(NetUtil, ipv4ToBinary) {
   uint8_t ipv4[4] = {0};
-  ASSERT_TRUE(NetUtil::ipv4ToBinary("123.123.123.244", ipv4));
-  ASSERT_TRUE(ipv4[0] == 123 && ipv4[1] == 123 && ipv4[2] == 123 && ipv4[3] == 244);
-  ASSERT_TRUE(NetUtil::ipv4ToBinary("1.2.3.4", ipv4));
-  ASSERT_TRUE(ipv4[0] == 1 && ipv4[1] == 2 && ipv4[2] == 3 && ipv4[3] == 4);
-  ASSERT_TRUE(NetUtil::ipv4ToBinary("1.22.33.255", ipv4));
-  ASSERT_TRUE(ipv4[0] == 1 && ipv4[1] == 22 && ipv4[2] == 33 && ipv4[3] == 255);
+  EXPECT_TRUE(NetUtil::ipv4ToBinary("123.123.123.244", ipv4));
+  EXPECT_TRUE(ipv4[0] == 123 && ipv4[1] == 123 && ipv4[2] == 123 && ipv4[3] == 244);
+  EXPECT_TRUE(NetUtil::ipv4ToBinary("1.2.3.4", ipv4));
+  EXPECT_TRUE(ipv4[0] == 1 && ipv4[1] == 2 && ipv4[2] == 3 && ipv4[3] == 4);
+  EXPECT_TRUE(NetUtil::ipv4ToBinary("1.22.33.255", ipv4));
+  EXPECT_TRUE(ipv4[0] == 1 && ipv4[1] == 22 && ipv4[2] == 33 && ipv4[3] == 255);
 }
 
 TEST(NetUtil, ipv6ToBinary) {
   uint8_t ipv6[16] = {0};
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("::", ipv6));
-  ASSERT_TRUE(ipv6[0] == 0 && ipv6[1] == 0 && ipv6[2] == 0 && ipv6[3] == 0 &&
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("::", ipv6));
+  EXPECT_TRUE(ipv6[0] == 0 && ipv6[1] == 0 && ipv6[2] == 0 && ipv6[3] == 0 &&
               ipv6[4] == 0 && ipv6[5] == 0 && ipv6[6] == 0 && ipv6[7] == 0 &&
               ipv6[8] == 0 && ipv6[9] == 0 && ipv6[10] == 0 && ipv6[11] == 0 &&
               ipv6[12] == 0 && ipv6[13] == 0 && ipv6[14] == 0 && ipv6[15] == 0);
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("::1", ipv6));
-  ASSERT_TRUE(ipv6[0] == 0 && ipv6[1] == 0 && ipv6[2] == 0 && ipv6[3] == 0 &&
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("::1", ipv6));
+  EXPECT_TRUE(ipv6[0] == 0 && ipv6[1] == 0 && ipv6[2] == 0 && ipv6[3] == 0 &&
               ipv6[4] == 0 && ipv6[5] == 0 && ipv6[6] == 0 && ipv6[7] == 0 &&
               ipv6[8] == 0 && ipv6[9] == 0 && ipv6[10] == 0 && ipv6[11] == 0 &&
               ipv6[12] == 0 && ipv6[13] == 0 && ipv6[14] == 0 && ipv6[15] == 1);
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("1::", ipv6));
-  ASSERT_TRUE(ipv6[0] == 0 && ipv6[1] == 1 && ipv6[2] == 0 && ipv6[3] == 0 &&
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("1::", ipv6));
+  EXPECT_TRUE(ipv6[0] == 0 && ipv6[1] == 1 && ipv6[2] == 0 && ipv6[3] == 0 &&
               ipv6[4] == 0 && ipv6[5] == 0 && ipv6[6] == 0 && ipv6[7] == 0 &&
               ipv6[8] == 0 && ipv6[9] == 0 && ipv6[10] == 0 && ipv6[11] == 0 &&
               ipv6[12] == 0 && ipv6[13] == 0 && ipv6[14] == 0 && ipv6[15] == 0);
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("1:feff::", ipv6));
-  ASSERT_TRUE(ipv6[0] == 0 && ipv6[1] == 1 && ipv6[2] == 0xfe && ipv6[3] == 0xff &&
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("1:feff::", ipv6));
+  EXPECT_TRUE(ipv6[0] == 0 && ipv6[1] == 1 && ipv6[2] == 0xfe && ipv6[3] == 0xff &&
               ipv6[4] == 0 && ipv6[5] == 0 && ipv6[6] == 0 && ipv6[7] == 0 &&
               ipv6[8] == 0 && ipv6[9] == 0 && ipv6[10] == 0 && ipv6[11] == 0 &&
               ipv6[12] == 0 && ipv6[13] == 0 && ipv6[14] == 0 && ipv6[15] == 0);
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("1:feff::1234", ipv6));
-  ASSERT_TRUE(ipv6[0] == 0 && ipv6[1] == 1 && ipv6[2] == 0xfe && ipv6[3] == 0xff &&
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("1:feff::1234", ipv6));
+  EXPECT_TRUE(ipv6[0] == 0 && ipv6[1] == 1 && ipv6[2] == 0xfe && ipv6[3] == 0xff &&
               ipv6[4] == 0 && ipv6[5] == 0 && ipv6[6] == 0 && ipv6[7] == 0 &&
               ipv6[8] == 0 && ipv6[9] == 0 && ipv6[10] == 0 && ipv6[11] == 0 &&
               ipv6[12] == 0 && ipv6[13] == 0 && ipv6[14] == 0x12 && ipv6[15] == 0x34);
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("1:feff:2:45:53:66:ae:1234", ipv6));
-  ASSERT_TRUE(ipv6[0] == 0 && ipv6[1] == 1 && ipv6[2] == 0xfe && ipv6[3] == 0xff &&
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("1:feff:2:45:53:66:ae:1234", ipv6));
+  EXPECT_TRUE(ipv6[0] == 0 && ipv6[1] == 1 && ipv6[2] == 0xfe && ipv6[3] == 0xff &&
               ipv6[4] == 0 && ipv6[5] == 2 && ipv6[6] == 0 && ipv6[7] == 0x45 &&
               ipv6[8] == 0 && ipv6[9] == 0x53 && ipv6[10] == 0 && ipv6[11] == 0x66 &&
               ipv6[12] == 0 && ipv6[13] == 0xae && ipv6[14] == 0x12 && ipv6[15] == 0x34);
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("1113:feff:acce:3399:aacc:33ff:1100:8899", ipv6));
-  ASSERT_TRUE(ipv6[0] == 0x11 && ipv6[1] == 0x13 && ipv6[2] == 0xfe && ipv6[3] == 0xff &&
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("1113:feff:acce:3399:aacc:33ff:1100:8899", ipv6));
+  EXPECT_TRUE(ipv6[0] == 0x11 && ipv6[1] == 0x13 && ipv6[2] == 0xfe && ipv6[3] == 0xff &&
               ipv6[4] == 0xac && ipv6[5] == 0xce && ipv6[6] == 0x33 && ipv6[7] == 0x99 &&
               ipv6[8] == 0xaa && ipv6[9] == 0xcc && ipv6[10] == 0x33 && ipv6[11] == 0xff &&
               ipv6[12] == 0x11 && ipv6[13] == 0 && ipv6[14] == 0x88 && ipv6[15] == 0x99);
 }
 
-TEST(NetUtil, ipv4IsSameSubnet) {
+TEST(NetUtil, ipv4IsInSubnet) {
   uint8_t subnet[4] = {0};
-  ASSERT_TRUE(NetUtil::ipv4ToBinary("192.168.1.100", subnet));
+  EXPECT_TRUE(NetUtil::ipv4ToBinary("192.168.1.100", subnet));
 
   uint8_t ipv4[4] = {0};
-  ASSERT_TRUE(NetUtil::ipv4ToBinary("192.168.2.120", ipv4));
-  ASSERT_TRUE(NetUtil::ipv4IsSameSubnet(ipv4, subnet, 16));
-  ASSERT_FALSE(NetUtil::ipv4IsSameSubnet(ipv4, subnet, 24));
-  ASSERT_TRUE(NetUtil::ipv4IsSameSubnet(ipv4, subnet, 22));
+  EXPECT_TRUE(NetUtil::ipv4ToBinary("192.168.2.120", ipv4));
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet(ipv4, subnet, 16));
+  EXPECT_FALSE(NetUtil::ipv4IsInSubnet(ipv4, subnet, 24));
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet(ipv4, subnet, 22));
 
-  ASSERT_TRUE(NetUtil::ipv4ToBinary("172.200.100.2", subnet));
-  ASSERT_TRUE(NetUtil::ipv4ToBinary("172.100.100.1", ipv4));
-  ASSERT_TRUE(NetUtil::ipv4IsSameSubnet(ipv4, subnet, 8));
+  EXPECT_TRUE(NetUtil::ipv4ToBinary("172.200.100.2", subnet));
+  EXPECT_TRUE(NetUtil::ipv4ToBinary("172.100.100.1", ipv4));
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet(ipv4, subnet, 8));
 }
 
-TEST(NetUtil, ipv6IsSameSubnet) {
+TEST(NetUtil, ipv4WithMaskIsInSubnet) {
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet("127.0.0.1", "127.0.0.1"));
+  EXPECT_FALSE(NetUtil::ipv4IsInSubnet("127.0.0.2", "127.0.0.1"));
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet("192.168.1.100", "192.168.1.0/24"));
+  EXPECT_FALSE(NetUtil::ipv4IsInSubnet("192.168.1.100", "192.168.2.0/24"));
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet("192.168.1.100", "192.168.1.0/0"));
+  EXPECT_FALSE(NetUtil::ipv4IsInSubnet("192.168.127.128", "192.168.255.0/17"));
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet("192.168.128.128", "192.168.255.0/17"));
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet("192.168.129.128", "192.168.255.0/17"));
+  EXPECT_FALSE(NetUtil::ipv4IsInSubnet("192.168.191.128", "192.168.255.0/18"));
+  EXPECT_TRUE(NetUtil::ipv4IsInSubnet("192.168.192.128", "192.168.255.0/18"));
+}
+
+TEST(NetUtil, ipv6WithMaskIsInSubnet) {
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet("::1", "::1/16"));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet("1::", "1::/1"));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet("fe33:aa22:fa12:ffff:5233::", "fe33:aa22:fa12::/32"));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet("fe33:aa22:fa12:ffff:5233::", "fe33:aa22:fa12::/48"));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet("fe33:aa22:fa12:8000:5233::", "fe33:aa22:fa12:ffff::/49"));
+  EXPECT_FALSE(NetUtil::ipv6IsInSubnet("fe33:aa22:fa12:8000:5233::", "fe33:aa22:fa12:ffff::/50"));
+  EXPECT_FALSE(NetUtil::ipv6IsInSubnet("fe33:aa22:fa12:8000:5233::", "fe33:aa22:fa12:ffff::/51"));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet("fe33:aa22:fa12:c000:5233::", "fe33:aa22:fa12:ffff::/50"));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet("fe33:aa22:fa12:ffff:5233::", "fe33:aa22:fa12:ffff::/64"));
+}
+
+TEST(NetUtil, ipv6IsInSubnet) {
   uint8_t subnet[16] = {0};
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("fe7f:41::", subnet));
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("fe7f:41::", subnet));
 
   uint8_t ipv6[16] = {0};
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("fe7f:41:3:55::", ipv6));
-  ASSERT_TRUE(NetUtil::ipv6IsSameSubnet(ipv6, subnet, 16));
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("fe7f:41:3:55::", ipv6));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet(ipv6, subnet, 16));
 
-  ASSERT_TRUE(NetUtil::ipv6ToBinary("fe7f:42:3:55::", ipv6));
-  ASSERT_TRUE(NetUtil::ipv6IsSameSubnet(ipv6, subnet, 16));
-  ASSERT_TRUE(NetUtil::ipv6IsSameSubnet(ipv6, subnet, 20));
-  ASSERT_TRUE(NetUtil::ipv6IsSameSubnet(ipv6, subnet, 24));
-  ASSERT_TRUE(NetUtil::ipv6IsSameSubnet(ipv6, subnet, 30));
-  ASSERT_FALSE(NetUtil::ipv6IsSameSubnet(ipv6, subnet, 31));
-  ASSERT_FALSE(NetUtil::ipv6IsSameSubnet(ipv6, subnet, 32));
+  EXPECT_TRUE(NetUtil::ipv6ToBinary("fe7f:42:3:55::", ipv6));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet(ipv6, subnet, 16));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet(ipv6, subnet, 20));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet(ipv6, subnet, 24));
+  EXPECT_TRUE(NetUtil::ipv6IsInSubnet(ipv6, subnet, 30));
+  EXPECT_FALSE(NetUtil::ipv6IsInSubnet(ipv6, subnet, 31));
+  EXPECT_FALSE(NetUtil::ipv6IsInSubnet(ipv6, subnet, 32));
 }
