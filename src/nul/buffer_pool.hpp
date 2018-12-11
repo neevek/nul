@@ -10,13 +10,18 @@
 #include <deque>
 #include <memory>
 #include <algorithm>
+#include <cassert>
 
 namespace nul {
   class BufferPool {
     public:
       BufferPool(std::size_t maxBufferSize, std::size_t maxBufferCount) :
         maxBufferSize_(maxBufferSize), maxBufferCount_(maxBufferCount) {
+        assert(maxBufferCount > 0);
+        for (int i = 0; i < maxBufferCount; ++i) {
+          freeBuffers_.push_back(std::make_unique<Buffer>(maxBufferSize));
         }
+      }
       virtual ~BufferPool() = default;
 
       std::unique_ptr<Buffer> requestBuffer(std::size_t size) {
@@ -35,7 +40,7 @@ namespace nul {
       }
 
       void returnBuffer(std::unique_ptr<Buffer> &&data) {
-        if (data->getCapacity() > maxBufferSize_ &&
+        if (data->getCapacity() <= maxBufferSize_ &&
             freeBuffers_.size() < maxBufferCount_) {
           freeBuffers_.push_back(std::move(data));
         }
@@ -46,6 +51,10 @@ namespace nul {
         auto dataBuf = requestBuffer(dataLen);
         dataBuf->assign(data, dataLen);
         return dataBuf;
+      }
+
+      std::size_t getTotalBufferCount() const {
+        return freeBuffers_.size();
       }
 
       uint64_t getTotalBufferSize() const {
