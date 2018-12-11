@@ -48,6 +48,14 @@ namespace nul {
         return dataBuf;
       }
 
+      uint64_t getTotalBufferSize() const {
+        uint64_t size = 0;
+        for (auto &b : freeBuffers_) {
+          size += b->getCapacity();
+        }
+        return size;
+      }
+
     private:
       std::deque<std::unique_ptr<Buffer>> freeBuffers_;
       std::size_t maxBufferSize_;
