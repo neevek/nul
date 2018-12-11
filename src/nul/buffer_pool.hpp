@@ -18,7 +18,7 @@ namespace nul {
       BufferPool(std::size_t maxBufferSize, std::size_t maxBufferCount) :
         maxBufferSize_(maxBufferSize), maxBufferCount_(maxBufferCount) {
         assert(maxBufferCount > 0);
-        for (int i = 0; i < maxBufferCount; ++i) {
+        for (std::size_t i = 0; i < maxBufferCount; ++i) {
           freeBuffers_.push_back(std::make_unique<Buffer>(maxBufferSize));
         }
       }
