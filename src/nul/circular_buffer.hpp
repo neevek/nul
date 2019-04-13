@@ -8,9 +8,10 @@
 #include <array>
 #include <mutex>
 #include <condition_variable>
+#include <chrono>
 
 namespace nul {
-  template <typename T, int MAX_SIZE>
+  template <typename T, std::size_t MAX_SIZE>
   class CircularBuffer final {
     public:
       void put(T data) {
@@ -24,19 +25,42 @@ namespace nul {
         cond_.notify_one();
       }
 
-      T take() {
+      T take(int waitTimeMillis = 0) {
         auto lock = std::unique_lock<std::mutex>(mutex_);
         if (size_ == 0) {
-          cond_.wait(lock, [&](){ return size_ > 0; });
+          if (waitTimeMillis <= 0) {
+            cond_.wait(lock);
+          } else {
+            cond_.wait_for(lock, std::chrono::milliseconds(waitTimeMillis));
+          }
         }
 
-        T data = std::move(arr_[tail_]);
-        tail_ = ++tail_ % MAX_SIZE;
-        --size_;
-        lock.unlock();
+        if (size_ > 0) {
+          T data = std::move(arr_[tail_]);
+          tail_ = ++tail_ % MAX_SIZE;
+          --size_;
 
-        cond_.notify_one();
-        return data;
+          lock.unlock();
+          cond_.notify_one();
+          return data;
+        }
+
+        return T{};
+      }
+
+      T takeOrDefault() {
+        auto lock = std::unique_lock<std::mutex>(mutex_);
+        if (size_ > 0) {
+          T data = std::move(arr_[tail_]);
+          tail_ = ++tail_ % MAX_SIZE;
+          --size_;
+
+          lock.unlock();
+          cond_.notify_one();
+          return data;
+        }
+
+        return T{};
       }
 
       std::size_t size() { 

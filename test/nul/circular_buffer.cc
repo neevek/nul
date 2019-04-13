@@ -2,6 +2,7 @@
 #include "nul/circular_buffer.hpp"
 #include "nul/log.hpp"
 #include <future>
+#include <thread>
 
 using namespace nul;
 
@@ -30,14 +31,14 @@ TEST(CircularBuffer, ConcurrentAccess) {
   nul::CircularBuffer<int, MAX_SIZE> cbuf;
 
   auto f1 = std::async(std::launch::async, [&](){
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 10; ++i) {
       cbuf.put(i);
     }
   });
 
   auto f2 = std::async(std::launch::async, [&](){
-    for (int i = 0; i < 1000; ++i) {
-      LOG_D("take, size=%lu, data=%d", cbuf.size(), cbuf.take());
+    for (int i = 0; i < 10; ++i) {
+      LOG_D("take, size=%lu, data=%d", cbuf.size(), cbuf.take(100));
     }
   });
 
@@ -45,3 +46,31 @@ TEST(CircularBuffer, ConcurrentAccess) {
   //f1.get();
 }
 
+TEST(CircularBuffer, UniquePointer) {
+
+  constexpr auto MAX_SIZE = 5;
+  nul::CircularBuffer<std::unique_ptr<int>, MAX_SIZE> cbuf;
+
+  auto f1 = std::async(std::launch::async, [&](){
+    for (int i = 0; i < 100; ++i) {
+      cbuf.put(std::make_unique<int>(i));
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+  });
+
+  auto f2 = std::async(std::launch::async, [&](){
+    int n = 100;
+    while (n > 0) {
+      auto p = cbuf.take(5);
+      if (p) {
+        --n;
+        LOG_D("take, size=%lu, data=%d", cbuf.size(), *p);
+      } else {
+        LOG_W("take returns null, size=%lu", cbuf.size());
+      }
+    }
+  });
+
+  f2.get();
+  //f1.get();
+}
