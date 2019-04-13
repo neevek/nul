@@ -4,6 +4,9 @@
 #include <future>
 #include <thread>
 
+#define ENABLE_PROFILING
+#include "nul/profiler.hpp"
+
 using namespace nul;
 
 TEST(CircularBuffer, Test) {
@@ -27,6 +30,7 @@ TEST(CircularBuffer, Test) {
 }
 
 TEST(CircularBuffer, ConcurrentAccess) {
+  PROFILE_TIME_COST_USEC("ConcurrentAccess");
   constexpr auto MAX_SIZE = 5;
   nul::CircularBuffer<int, MAX_SIZE> cbuf;
 
@@ -47,6 +51,7 @@ TEST(CircularBuffer, ConcurrentAccess) {
 }
 
 TEST(CircularBuffer, UniquePointer) {
+  PROFILE_TIME_COST_USEC("UniquePointer");
 
   constexpr auto MAX_SIZE = 5;
   nul::CircularBuffer<std::unique_ptr<int>, MAX_SIZE> cbuf;
