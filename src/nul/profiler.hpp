@@ -88,13 +88,14 @@ namespace nul {
   using TimeCostCalcHour = Profiler<std::chrono::hours>;
   using TimeCostCalcMinute = Profiler<std::chrono::minutes>;
   using TimeCostCalcSec = Profiler<std::chrono::seconds>;
+} /* end of namespace: nul */
 
 #define EXPAND_(a, b) a ## b
 #define COMBINE_(a, b) EXPAND_(a, b)
 
 #ifdef ENABLE_PROFILING
 #define PROFILE_TIME_COST(time_unit, fmt, ...)\
-    Profiler<time_unit> \
+    nul::Profiler<time_unit> \
     COMBINE_(__t, __LINE__) (__FILENAME__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 #else
 #define PROFILE_TIME_COST(time_unit, fmt, ...)
@@ -108,8 +109,6 @@ namespace nul {
 
 #define PROFILE_TIME_COST_NSEC(fmt, ...)\
     PROFILE_TIME_COST(std::chrono::nanoseconds, fmt, ##__VA_ARGS__)
-  
-} /* end of namespace: nul */
 
 #endif //PROFILER_H_
 
