@@ -35,6 +35,9 @@ namespace nul {
       T take(int waitTimeMillis = 0) {
         auto lock = std::unique_lock<std::mutex>(mutex_);
         if (size_ == 0) {
+          if (interrupted_) {
+            return T{};
+          }
           if (waitTimeMillis <= 0) {
             cond_.wait(lock);
           } else {
