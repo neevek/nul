@@ -35,32 +35,12 @@ namespace nul {
           }
         }
 
-        if (size_ > 0) {
-          T data = std::move(arr_[tail_]);
-          tail_ = ++tail_ % MAX_SIZE;
-          --size_;
-
-          lock.unlock();
-          cond_.notify_one();
-          return data;
-        }
-
-        return T{};
+        return internalTakeOrDefault(lock);
       }
 
       T takeOrDefault() {
         auto lock = std::unique_lock<std::mutex>(mutex_);
-        if (size_ > 0) {
-          T data = std::move(arr_[tail_]);
-          tail_ = ++tail_ % MAX_SIZE;
-          --size_;
-
-          lock.unlock();
-          cond_.notify_one();
-          return data;
-        }
-
-        return T{};
+        return internalTakeOrDefault(lock);
       }
 
       std::size_t size() { 
@@ -74,6 +54,21 @@ namespace nul {
 
       constexpr std::size_t capacity() const { 
         return MAX_SIZE;
+      }
+
+    private:
+      T internalTakeOrDefault(std::unique_lock<std::mutex> &lock) {
+        if (size_ > 0) {
+          T data = std::move(arr_[tail_]);
+          tail_ = ++tail_ % MAX_SIZE;
+          --size_;
+
+          lock.unlock();
+          cond_.notify_one();
+          return data;
+        }
+
+        return T{};
       }
     
     private:

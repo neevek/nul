@@ -3,6 +3,7 @@
 #include "nul/log.hpp"
 #include <future>
 #include <thread>
+#include <functional>
 
 #define ENABLE_PROFILING
 #include "nul/profiler.hpp"
@@ -53,12 +54,17 @@ TEST(CircularBuffer, ConcurrentAccess) {
 TEST(CircularBuffer, UniquePointer) {
   PROFILE_TIME_COST_USEC("UniquePointer");
 
+  auto IntegerDeleter = [](int* p) { delete p; };
+  using Integer = std::unique_ptr<int, std::function<void(int *)>>;
+
   constexpr auto MAX_SIZE = 5;
-  nul::CircularBuffer<std::unique_ptr<int>, MAX_SIZE> cbuf;
+  nul::CircularBuffer<Integer, MAX_SIZE> cbuf;
 
   auto f1 = std::async(std::launch::async, [&](){
     for (int i = 0; i < 100; ++i) {
-      cbuf.put(std::make_unique<int>(i));
+      auto p = Integer{new int, IntegerDeleter};
+      *p = i;
+      cbuf.put(std::move(p));
       std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
   });
@@ -77,5 +83,5 @@ TEST(CircularBuffer, UniquePointer) {
   });
 
   f2.get();
-  //f1.get();
+  f1.get();
 }

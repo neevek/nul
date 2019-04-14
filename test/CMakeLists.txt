@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 enable_testing()
 
-set(CMAKE_CXX_FLAGS "-g -Wall -std=c++14 -DLOG_VERBOSE -DLOG_TAG_NAME='\"nul\"'")
+set(CMAKE_CXX_FLAGS "-g -Wall -std=c++1z -DLOG_VERBOSE -DLOG_TAG_NAME='\"nul\"'")
 set(NUL_SRC_DIR ${CMAKE_SOURCE_DIR}/../src)
 include_directories(${NUL_SRC_DIR})
 
