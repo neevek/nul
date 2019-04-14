@@ -16,8 +16,14 @@ namespace nul {
     public:
       void put(T data) {
         auto lock = std::unique_lock<std::mutex>(mutex_);
+        if (interrupted_) {
+          return;
+        }
         if (size_ == MAX_SIZE) {
-          cond_.wait(lock, [&](){ return size_ < MAX_SIZE; });
+          cond_.wait(lock, [&](){ return interrupted_ || size_ < MAX_SIZE; });
+          if (interrupted_) {
+            return;
+          }
         }
         arr_[head_] = std::move(data);
         head_ = ++head_ % MAX_SIZE;
@@ -32,6 +38,9 @@ namespace nul {
             cond_.wait(lock);
           } else {
             cond_.wait_for(lock, std::chrono::milliseconds(waitTimeMillis));
+          }
+          if (interrupted_) {
+            return T{};
           }
         }
 
@@ -54,6 +63,23 @@ namespace nul {
 
       constexpr std::size_t capacity() const { 
         return MAX_SIZE;
+      }
+
+      bool interrupted() {
+        auto lock = std::unique_lock<std::mutex>(mutex_);
+        return interrupted_;
+      }
+
+      bool interruptedAndEmpty() {
+        auto lock = std::unique_lock<std::mutex>(mutex_);
+        return interrupted_ && size_ == 0;
+      }
+
+      // once interrupted, the queue will no longer accept put
+      void interrupt() {
+        auto lock = std::unique_lock<std::mutex>(mutex_);
+        interrupted_ = true;
+        cond_.notify_all();
       }
 
     private:
@@ -79,6 +105,8 @@ namespace nul {
 
       std::condition_variable cond_;
       std::mutex mutex_;
+
+      bool interrupted_{false};
   };
 } /* end of namespace: nul */
 
