@@ -14,21 +14,22 @@ namespace nul {
   template <typename T, std::size_t MAX_SIZE>
   class CircularBuffer final {
     public:
-      void put(T data) {
+      bool put(T data) {
         auto lock = std::unique_lock<std::mutex>(mutex_);
         if (interrupted_) {
-          return;
+          return false;
         }
         if (size_ == MAX_SIZE) {
           cond_.wait(lock, [&](){ return interrupted_ || size_ < MAX_SIZE; });
           if (interrupted_) {
-            return;
+            return false;
           }
         }
         arr_[head_] = std::move(data);
         head_ = ++head_ % MAX_SIZE;
         ++size_;
         cond_.notify_one();
+        return true;
       }
 
       T take(int waitTimeMillis = 0) {
