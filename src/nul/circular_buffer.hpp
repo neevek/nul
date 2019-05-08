@@ -32,14 +32,16 @@ namespace nul {
         return true;
       }
 
-      T take(int waitTimeMillis = 0) {
+      T take(int waitTimeMillis = -1) {
         auto lock = std::unique_lock<std::mutex>(mutex_);
         if (size_ == 0) {
           if (interrupted_) {
             return T{};
           }
-          if (waitTimeMillis <= 0) {
-            cond_.wait(lock);
+          if (waitTimeMillis < 0) {
+            cond_.wait(lock);   // wait until being notified
+          } else if (waitTimeMillis == 0) {
+            return T{};         // don't wait
           } else {
             cond_.wait_for(lock, std::chrono::milliseconds(waitTimeMillis));
           }
