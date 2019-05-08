@@ -39,7 +39,7 @@ namespace nul {
             return T{};
           }
           if (waitTimeMillis < 0) {
-            cond_.wait(lock);   // wait until being notified
+            cond_.wait(lock, [&](){ return interrupted_ || size_ > 0; });
           } else if (waitTimeMillis == 0) {
             return T{};         // don't wait
           } else {
