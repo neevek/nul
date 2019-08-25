@@ -41,7 +41,7 @@ ExternalProject_Get_Property(gtest INSTALL_DIR)
 set(GTEST_INCLUDE_DIR ${INSTALL_DIR}/installed/include)
 set(GTEST_LIBRARY_DIR ${INSTALL_DIR}/installed/lib)
 SET_LIBRARY_PROP(libgtest gtest "${GTEST_LIBRARY_DIR}/libgtest.a")
-SET_LIBRARY_PROP(libgmock gtest "${GTEST_LIBRARY_DIR}/libgmock.a")
+SET_LIBRARY_PROP(libgmock gmock "${GTEST_LIBRARY_DIR}/libgmock.a")
 
 include_directories(
   "${GTEST_INCLUDE_DIR}"
@@ -60,3 +60,4 @@ ADD_NUL_TEST(xbuffer nul/xbuffer.cc)
 ADD_NUL_TEST(util nul/util.cc)
 ADD_NUL_TEST(uri nul/uri.cc)
 ADD_NUL_TEST(circular_buffer nul/circular_buffer.cc)
+ADD_NUL_TEST(task_queue nul/task_queue.cc)
