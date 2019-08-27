@@ -20,7 +20,7 @@ TEST(TaskQueue, Test) {
   auto delay = 500;
 
   {
-    q.postDelayed(delay, [&count](int delayedTime){
+    q.postDelayed(delay, [&count](int64_t delayedTime){
       EXPECT_GE(getCurrentTime(), delayedTime);
       ++count;
     }, getCurrentTime() + delay);
