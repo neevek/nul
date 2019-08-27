@@ -129,7 +129,7 @@ namespace nul {
 
             lock.unlock();
             if (useStdAsync_) {
-              std::async(std::launch::async, task);
+              std::async(std::launch::async, std::cref(task));
             } else {
               task();
             }
@@ -148,7 +148,7 @@ namespace nul {
               lock.unlock();
 
               if (useStdAsync_) {
-                std::async(std::launch::async, timedTask->task);
+                std::async(std::launch::async, std::cref(timedTask->task));
               } else {
                 timedTask->task();
               }
@@ -232,4 +232,3 @@ namespace nul {
 } /* end of namespace: nul */
 
 #endif /* end of include guard: TASK_QUEUE_H_ */
-
