@@ -48,6 +48,9 @@ namespace nul {
   class TaskQueue final {
     public:
       TaskQueue(bool useStdAsync = false) : useStdAsync_(useStdAsync) {}
+      TaskQueue(const TaskQueue &) = delete;
+      TaskQueue &operator=(const TaskQueue &) = delete;
+
       ~TaskQueue() {
         if (t_) {
           t_->join();
