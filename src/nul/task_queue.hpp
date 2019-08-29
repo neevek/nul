@@ -58,37 +58,41 @@ namespace nul {
       }
 
       template <typename Callbale, typename ...Args>
-      void post(Callbale task, Args ...args) {
+      bool post(Callbale task, Args ...args) {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (!running_) {
+          return false;
+        }
         q_.push(std::bind(task, std::forward<Args>(args)...));
         cond_.notify_one();
+        return true;
       }
 
       template <typename Callbale, typename ...Args>
-      void postDelayed(int64_t delayMs, Callbale task, Args ...args) {
-        postAtIntervalInternal(
+      bool postDelayed(int64_t delayMs, Callbale task, Args ...args) {
+        return postAtIntervalInternal(
           "", delayMs, 0, task, std::forward<Args>(args)...);
       }
 
       template <typename Callbale, typename ...Args>
-      void postDelayed(
+      bool postDelayed(
         const std::string &name, int64_t delayMs, Callbale task, Args ...args) {
-        postAtIntervalInternal(
+        return postAtIntervalInternal(
           name, delayMs, 0, task, std::forward<Args>(args)...);
       }
 
       template <typename Callbale, typename ...Args>
-      void postAtInterval(
+      bool postAtInterval(
         int64_t delayMs, int64_t intervalMs, Callbale task, Args ...args) {
-        postAtIntervalInternal(
+        return postAtIntervalInternal(
           "", delayMs, intervalMs, task, std::forward<Args>(args)...);
       }
 
       template <typename Callbale, typename ...Args>
-      void postAtInterval(
+      bool postAtInterval(
         const std::string &name, int64_t delayMs, int64_t intervalMs,
         Callbale task, Args ...args) {
-        postAtIntervalInternal(
+        return postAtIntervalInternal(
           name, delayMs, intervalMs, task, std::forward<Args>(args)...);
       }
 
@@ -181,7 +185,7 @@ namespace nul {
       }
 
       template <typename Callbale, typename ...Args>
-      void postAtIntervalInternal(
+      bool postAtIntervalInternal(
         const std::string &name, int64_t delayMs,
         int64_t intervalMs, Callbale task, Args ...args) {
 
@@ -198,11 +202,14 @@ namespace nul {
           std::bind(task, std::forward<Args>(args)...)
         );
 
-        addTimedTask(std::move(timedTask));
+        return addTimedTask(std::move(timedTask));
       }
 
-      void addTimedTask(std::unique_ptr<TimedTask> timedTask) {
+      bool addTimedTask(std::unique_ptr<TimedTask> timedTask) {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (!running_) {
+          return false;
+        }
 
         auto inserted = false;
         auto it = delayedQ_.begin();
@@ -219,6 +226,7 @@ namespace nul {
         }
 
         cond_.notify_one();
+        return true;
       }
     
     private:
