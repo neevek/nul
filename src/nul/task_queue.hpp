@@ -52,7 +52,10 @@ namespace nul {
       TaskQueue &operator=(const TaskQueue &) = delete;
 
       ~TaskQueue() {
+        std::unique_lock<std::mutex> lock(mutex_);
         if (t_) {
+          lock.unlock();
+          stop(true);
           t_->join();
         }
       }
@@ -60,7 +63,7 @@ namespace nul {
       template <typename Callbale, typename ...Args>
       bool post(Callbale task, Args ...args) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!running_) {
+        if (!running_ || gracefulStopping_) {
           return false;
         }
         q_.push(std::bind(task, std::forward<Args>(args)...));
@@ -112,15 +115,20 @@ namespace nul {
       }
 
       void start() {
+        std::lock_guard<std::mutex> lock(mutex_);
         if (!t_) {
           running_ = true;
           t_ = std::make_unique<std::thread>(&TaskQueue::run, this);
         }
       }
 
-      void stop() {
+      void stop(bool gracefulStop = false) {
         std::lock_guard<std::mutex> lock(mutex_);
-        running_ = false;
+        if (running_ && gracefulStop) {
+          gracefulStopping_ = true;
+        } else {
+          running_ = false;
+        }
         cond_.notify_all();
       }
 
@@ -171,6 +179,12 @@ namespace nul {
             lock = std::unique_lock<std::mutex>(mutex_);
           }
           if (running_ && q_.empty()) {
+            // if in gracefulStopping_ state, delayed tasks will be ignored
+            if (gracefulStopping_) {
+              running_ = false;
+              break;
+            }
+
             if (!delayedQ_.empty()) {
               auto triggerTimeMs = delayedQ_.front()->triggerTimeMs;
               auto delay = triggerTimeMs - duration_cast<milliseconds>(
@@ -207,7 +221,7 @@ namespace nul {
 
       bool addTimedTask(std::unique_ptr<TimedTask> timedTask) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!running_) {
+        if (!running_ || gracefulStopping_) {
           return false;
         }
 
@@ -237,6 +251,7 @@ namespace nul {
       std::condition_variable cond_;
 
       bool running_{false};
+      bool gracefulStopping_{false};
       bool useStdAsync_;
   };
 
