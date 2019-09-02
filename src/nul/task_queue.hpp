@@ -71,6 +71,23 @@ namespace nul {
         return true;
       }
 
+      template <typename Callbale, typename ...Args,
+               typename R = typename std::result_of<Callbale(Args...)>::type>
+      R postSync(Callbale task, Args ...args) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (!running_ || gracefulStopping_) {
+          return task(std::forward<Args>(args)...);
+        }
+
+        auto p = std::promise<R>();
+        auto f = p.get_future();
+        q_.push([&]{ p.set_value(task(std::forward<Args>(args)...)); });
+        lock.unlock();
+        cond_.notify_one();
+
+        return f.get();
+      }
+
       template <typename Callbale, typename ...Args>
       bool postDelayed(int64_t delayMs, Callbale task, Args ...args) {
         return postAtIntervalInternal(
