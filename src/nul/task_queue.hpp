@@ -60,8 +60,8 @@ namespace nul {
         }
       }
 
-      template <typename Callbale, typename ...Args>
-      bool post(Callbale task, Args ...args) {
+      template <typename Callable, typename ...Args>
+      bool post(Callable task, Args ...args) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!running_ || gracefulStopping_) {
           return false;
@@ -71,9 +71,9 @@ namespace nul {
         return true;
       }
 
-      template <typename Callbale, typename ...Args,
-               typename R = typename std::result_of<Callbale(Args...)>::type>
-      R postSync(Callbale task, Args ...args) {
+      template <typename Callable, typename ...Args,
+               typename R = typename std::result_of<Callable(Args...)>::type>
+      R postSync(Callable task, Args ...args) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (!running_ || gracefulStopping_) {
           return task(std::forward<Args>(args)...);
@@ -88,30 +88,30 @@ namespace nul {
         return f.get();
       }
 
-      template <typename Callbale, typename ...Args>
-      bool postDelayed(int64_t delayMs, Callbale task, Args ...args) {
+      template <typename Callable, typename ...Args>
+      bool postDelayed(int64_t delayMs, Callable task, Args ...args) {
         return postAtIntervalInternal(
           "", delayMs, 0, task, std::forward<Args>(args)...);
       }
 
-      template <typename Callbale, typename ...Args>
+      template <typename Callable, typename ...Args>
       bool postDelayed(
-        const std::string &name, int64_t delayMs, Callbale task, Args ...args) {
+        const std::string &name, int64_t delayMs, Callable task, Args ...args) {
         return postAtIntervalInternal(
           name, delayMs, 0, task, std::forward<Args>(args)...);
       }
 
-      template <typename Callbale, typename ...Args>
+      template <typename Callable, typename ...Args>
       bool postAtInterval(
-        int64_t delayMs, int64_t intervalMs, Callbale task, Args ...args) {
+        int64_t delayMs, int64_t intervalMs, Callable task, Args ...args) {
         return postAtIntervalInternal(
           "", delayMs, intervalMs, task, std::forward<Args>(args)...);
       }
 
-      template <typename Callbale, typename ...Args>
+      template <typename Callable, typename ...Args>
       bool postAtInterval(
         const std::string &name, int64_t delayMs, int64_t intervalMs,
-        Callbale task, Args ...args) {
+        Callable task, Args ...args) {
         return postAtIntervalInternal(
           name, delayMs, intervalMs, task, std::forward<Args>(args)...);
       }
@@ -215,10 +215,10 @@ namespace nul {
         }
       }
 
-      template <typename Callbale, typename ...Args>
+      template <typename Callable, typename ...Args>
       bool postAtIntervalInternal(
         const std::string &name, int64_t delayMs,
-        int64_t intervalMs, Callbale task, Args ...args) {
+        int64_t intervalMs, Callable task, Args ...args) {
 
         if (delayMs < 0) {
           delayMs = 0;
