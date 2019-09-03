@@ -97,20 +97,46 @@ namespace nul {
       }
 
       template <typename Callable, typename ...Args,
-               typename R = typename std::result_of<Callable(Args...)>::type>
+               typename R = typename std::result_of<Callable(Args...)>::type,
+               typename = typename std::enable_if<!std::is_void<R>::value, R>::type>
       R postSync(Callable task, Args ...args) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (!running_ || gracefulStopping_) {
-          return task(std::forward<Args>(args)...);
+          return std::bind(task, std::forward<Args>(args)...)();
         }
 
         auto p = std::promise<R>();
         auto f = p.get_future();
-        q_.push([&]{ p.set_value(task(std::forward<Args>(args)...)); });
+        q_.push([&]{
+          p.set_value(std::bind(task, std::forward<Args>(args)...)());
+        });
         lock.unlock();
         cond_.notify_one();
 
         return f.get();
+      }
+
+      // this specialization is needed because we cannot
+      // call promise.set_value(void_value)
+      template <typename Callable, typename ...Args,
+               typename R = typename std::result_of<Callable(Args...)>::type,
+               typename = typename std::enable_if<std::is_void<R>::value, void>::type>
+      void postSync(Callable task, Args ...args) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (!running_ || gracefulStopping_) {
+          std::bind(task, std::forward<Args>(args)...)();
+        }
+
+        auto p = std::promise<void>();
+        auto f = p.get_future();
+        q_.push([&]{ 
+          std::bind(task, std::forward<Args>(args)...)();
+          p.set_value();
+        });
+        lock.unlock();
+        cond_.notify_one();
+
+        f.get();
       }
 
       template <typename Callable, typename ...Args>
