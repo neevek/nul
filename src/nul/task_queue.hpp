@@ -16,6 +16,11 @@
 #include <deque>
 #include <chrono>
 #include <future>
+#include <pthread.h>
+
+#ifdef __ANDROID__
+#include <sys/prctl.h>
+#endif
 
 #if __cplusplus == 201103L || (defined(_MSC_VER) && _MSC_VER == 1900)
 namespace std {
@@ -72,7 +77,8 @@ namespace nul {
 
   class TaskQueue final {
     public:
-      TaskQueue(bool useStdAsync = false) : useStdAsync_(useStdAsync) {}
+      TaskQueue(const std::string &name = "", bool useStdAsync = false) :
+        name_(name), useStdAsync_(useStdAsync) {}
       TaskQueue(const TaskQueue &) = delete;
       TaskQueue &operator=(const TaskQueue &) = delete;
 
@@ -86,7 +92,7 @@ namespace nul {
       }
 
       template <typename Callable, typename ...Args>
-      bool post(Callable task, Args ...args) {
+      bool post(Callable &&task, Args &&...args) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!running_ || gracefulStopping_) {
           return false;
@@ -99,7 +105,7 @@ namespace nul {
       template <typename Callable, typename ...Args,
                typename R = typename std::result_of<Callable(Args...)>::type,
                typename = typename std::enable_if<!std::is_void<R>::value, R>::type>
-      R postSync(Callable task, Args ...args) {
+      R postSync(Callable &&task, Args &&...args) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (!running_ || gracefulStopping_) {
           return std::bind(task, std::forward<Args>(args)...)();
@@ -121,7 +127,7 @@ namespace nul {
       template <typename Callable, typename ...Args,
                typename R = typename std::result_of<Callable(Args...)>::type,
                typename = typename std::enable_if<std::is_void<R>::value, void>::type>
-      void postSync(Callable task, Args ...args) {
+      void postSync(Callable &&task, Args &&...args) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (!running_ || gracefulStopping_) {
           std::bind(task, std::forward<Args>(args)...)();
@@ -129,7 +135,7 @@ namespace nul {
 
         auto p = std::promise<void>();
         auto f = p.get_future();
-        q_.push([&]{ 
+        q_.push([&]{
           std::bind(task, std::forward<Args>(args)...)();
           p.set_value();
         });
@@ -140,21 +146,21 @@ namespace nul {
       }
 
       template <typename Callable, typename ...Args>
-      bool postDelayed(int64_t delayMs, Callable task, Args ...args) {
+      bool postDelayed(int64_t delayMs, Callable &&task, Args &&...args) {
         return postAtIntervalInternal(
           "", delayMs, 0, task, std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
       bool postDelayed(
-        const std::string &name, int64_t delayMs, Callable task, Args ...args) {
+        const std::string &name, int64_t delayMs, Callable &&task, Args &&...args) {
         return postAtIntervalInternal(
-          name, delayMs, 0, task, std::forward<Args>(args)...);
+          name, delayMs, -1, task, std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
       bool postAtInterval(
-        int64_t delayMs, int64_t intervalMs, Callable task, Args ...args) {
+        int64_t delayMs, int64_t intervalMs, Callable &&task, Args &&...args) {
         return postAtIntervalInternal(
           "", delayMs, intervalMs, task, std::forward<Args>(args)...);
       }
@@ -162,7 +168,7 @@ namespace nul {
       template <typename Callable, typename ...Args>
       bool postAtInterval(
         const std::string &name, int64_t delayMs, int64_t intervalMs,
-        Callable task, Args ...args) {
+        Callable &&task, Args &&...args) {
         return postAtIntervalInternal(
           name, delayMs, intervalMs, task, std::forward<Args>(args)...);
       }
@@ -200,6 +206,9 @@ namespace nul {
         cond_.notify_all();
       }
 
+      std::string getName() const {
+        return name_;
+      }
 
       bool isRunning() const {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -208,6 +217,14 @@ namespace nul {
 
     private:
       void run() {
+        if (!name_.empty()) {
+#ifdef __ANDROID__
+          prctl(PR_SET_NAME, (unsigned long)name_.c_str(), 0, 0, 0);
+#elif __APPLE__
+          pthread_setname_np(name_.c_str());
+#endif
+        }
+
         using namespace std::chrono;
 
         while (running_) {
@@ -275,7 +292,7 @@ namespace nul {
       template <typename Callable, typename ...Args>
       bool postAtIntervalInternal(
         const std::string &name, int64_t delayMs,
-        int64_t intervalMs, Callable task, Args ...args) {
+        int64_t intervalMs, Callable &&task, Args &&...args) {
 
         if (delayMs < 0) {
           delayMs = 0;
@@ -316,7 +333,7 @@ namespace nul {
         cond_.notify_one();
         return true;
       }
-    
+
     private:
       std::queue<std::function<void()>> q_;
       std::deque<std::unique_ptr<TimedTask>> delayedQ_;
@@ -324,9 +341,10 @@ namespace nul {
       std::condition_variable cond_;
       mutable std::mutex mutex_;
 
+      std::string name_;
+      bool useStdAsync_;
       bool running_{false};
       bool gracefulStopping_{false};
-      bool useStdAsync_;
   };
 
 } /* end of namespace: nul */
