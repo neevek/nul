@@ -11,18 +11,12 @@
 extern "C" {
 #endif
 
-#if !defined(__FILENAME__)
-#define __FILENAME__\
-  (strrchr(__FILE__, '/') ?\
-   strrchr(__FILE__, '/') + 1 : __FILE__)
-#endif
-
 #define MAX_FMT_SIZE 0xFF
 #define TIME_BUFFER_SIZE 24
 
 #ifdef __ANDROID__
 #include <android/log.h>
-#define LOG_LEVEL_VERBOSE ANDROID_LOG_VERBOSE 
+#define LOG_LEVEL_VERBOSE ANDROID_LOG_VERBOSE
 #define LOG_LEVEL_DEBUG ANDROID_LOG_DEBUG
 #define LOG_LEVEL_INFO ANDROID_LOG_INFO
 #define LOG_LEVEL_WARN ANDROID_LOG_WARN
@@ -33,6 +27,20 @@ extern "C" {
 #define LOG_LEVEL_INFO 4
 #define LOG_LEVEL_WARN 5
 #define LOG_LEVEL_ERROR 6
+#endif
+
+#ifdef LOG_LINE_INFO
+#if !defined(__FILENAME__)
+#define __FILENAME__\
+  (strrchr(__FILE__ ":", '/') ?\
+   strrchr(__FILE__ ":", '/') + 1 : __FILE__ ":")
+#endif
+
+#define FILENAME_INFO __FILENAME__
+#define FUNCTION_INFO __FUNCTION__
+#else
+#define FILENAME_INFO ""
+#define FUNCTION_INFO ""
 #endif
 
 inline char *log_strtime(char *buffer) {
@@ -48,13 +56,13 @@ inline char *log_strtime(char *buffer) {
 }
 
 inline static const char *log_prio_str_(int prio) {
-  switch(prio) { 
+  switch(prio) {
     case LOG_LEVEL_VERBOSE: return "V";
     case LOG_LEVEL_DEBUG: return "D";
     case LOG_LEVEL_INFO: return "I";
     case LOG_LEVEL_WARN: return "W";
     case LOG_LEVEL_ERROR: return "E";
-  } 
+  }
   return "";
 }
 
@@ -63,17 +71,17 @@ inline static const char *log_prio_str_(int prio) {
 #define DO_LOG_(prio, color, fmt, ...) do { \
   FILE *f = fopen(LOG_FILE_PATH, "a+"); \
   char _LogTimeBuf_[TIME_BUFFER_SIZE];  \
-  fprintf(f, "%s %s [%s] [%s:%d] %s - " fmt "\n", \
+  fprintf(f, "%s %s [%s] [%s%d] %s - " fmt "\n", \
       log_strtime(_LogTimeBuf_), LOG_TAG_NAME, log_prio_str_(prio), \
-      __FILENAME__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+      FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
   fclose(f); \
 } while (0)
 
 // log to Android logcat
 #elif __ANDROID__
 #define DO_LOG_(prio, color, fmt, ...) do { \
-  __android_log_print(prio, LOG_TAG_NAME, "[%s:%d] %s - " fmt "\n", \
-      __FILENAME__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+  __android_log_print(prio, LOG_TAG_NAME, "[%s%d] %s - " fmt "\n", \
+      FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
 } while (0)
 
 #else
@@ -90,7 +98,7 @@ inline static const char *log_prio_str_(int prio) {
 #define KBLU
 #define KRED
 #define KGRN
-#define KYEL 
+#define KYEL
 #define KEND
 #endif
 
@@ -98,8 +106,8 @@ inline static const char *log_prio_str_(int prio) {
 #define DO_LOG_(prio, color, fmt, ...) do { \
   char _LogTimeBuf_[TIME_BUFFER_SIZE];  \
   fprintf(stderr, color "%s %s [%s] [%s:%d] %s - " fmt KEND "\n", \
-      log_strtime(_LogTimeBuf_), LOG_TAG_NAME, log_prio_str_(prio), __FILENAME__, \
-      __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+      log_strtime(_LogTimeBuf_), LOG_TAG_NAME, log_prio_str_(prio), FILENAME_INFO, \
+      __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
 } while (0)
 #endif
 
@@ -110,7 +118,7 @@ inline static const char *log_prio_str_(int prio) {
 #define LOG_WARN
 #define LOG_ERROR
 
-#define LOG_LEVEL LOG_LEVEL_VERBOSE 
+#define LOG_LEVEL LOG_LEVEL_VERBOSE
 #else
 #define LOG_V(fmt, ...)
 #endif
@@ -122,7 +130,7 @@ inline static const char *log_prio_str_(int prio) {
 #define LOG_ERROR
 
 #undef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_VERBOSE 
+#define LOG_LEVEL LOG_LEVEL_VERBOSE
 #else
 #define LOG_D(fmt, ...)
 #endif
@@ -166,4 +174,3 @@ inline static const char *log_prio_str_(int prio) {
 #endif
 
 #endif /* end of include guard: NUL_LOG_H_ */
-
