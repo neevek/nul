@@ -130,7 +130,7 @@ namespace nul {
         } else {
           running_ = false;
         }
-        cond_.notify_all();
+        cond_.notify_one();
       }
 
       std::string getName() const {
@@ -145,7 +145,7 @@ namespace nul {
     private:
       bool postTask(std::unique_ptr<Task> task) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!running_) {
+        if (!running_ || gracefulStopping_) {
           return false;
         }
         q_.push_back(std::move(task));
@@ -155,7 +155,7 @@ namespace nul {
 
       bool postTimedTask(std::unique_ptr<TimedTask> timedTask) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!running_) {
+        if (!running_ || gracefulStopping_) {
           return false;
         }
 
@@ -190,8 +190,6 @@ namespace nul {
             ++it;
           }
         }
-
-        cond_.notify_one();
       }
 
       void removeAllPendingTasks(void *marker) {
@@ -206,8 +204,6 @@ namespace nul {
         while (it2 != delayedQ_.end()) {
           remove(delayedQ_, it2, marker);
         }
-
-        cond_.notify_one();
       }
 
     private:
@@ -232,11 +228,9 @@ namespace nul {
 
             lock.unlock();
             task->call();
+            continue;
           }
 
-          if (!lock.owns_lock()) {
-            lock = std::unique_lock<std::mutex>(mutex_);
-          }
           if (!delayedQ_.empty()) {
             auto now = duration_cast<milliseconds>(
               system_clock::now().time_since_epoch()).count();
@@ -252,12 +246,10 @@ namespace nul {
                 timedTask->triggerTimeMs += timedTask->intervalMs;
                 postTimedTask(std::move(timedTask));
               }
+              continue;
             }
           }
 
-          if (!lock.owns_lock()) {
-            lock = std::unique_lock<std::mutex>(mutex_);
-          }
           if (running_ && q_.empty()) {
             // if in gracefulStopping_ state, delayed tasks will be ignored
             if (gracefulStopping_) {
@@ -269,7 +261,10 @@ namespace nul {
               auto triggerTimeMs = delayedQ_.front()->triggerTimeMs;
               auto delay = triggerTimeMs - duration_cast<milliseconds>(
                 system_clock::now().time_since_epoch()).count();
-              cond_.wait_for(lock, milliseconds(delay > 0 ? delay : 0));
+              if (delay <= 0) {
+                continue;
+              }
+              cond_.wait_for(lock, milliseconds(delay));
 
             } else {
               cond_.wait(lock);
@@ -297,15 +292,15 @@ namespace nul {
       }
 
     private:
-      std::deque<std::unique_ptr<Task>> q_;
-      std::deque<std::unique_ptr<TimedTask>> delayedQ_;
+      std::deque<std::unique_ptr<Task>> q_;             // guarded by mutex_
+      std::deque<std::unique_ptr<TimedTask>> delayedQ_; // guarded by mutex_
       std::unique_ptr<std::thread> t_{nullptr};
       std::condition_variable cond_;
       mutable std::mutex mutex_;
 
       std::string name_;
-      bool running_{false};
-      bool gracefulStopping_{false};
+      bool running_{false};           // guarded by mutex_
+      bool gracefulStopping_{false};  // guarded by mutex_
   };
 
   class TaskQueue final {
@@ -316,6 +311,7 @@ namespace nul {
 
       template <typename Callable, typename ...Args>
       bool post(Callable &&call, Args &&...args) {
+        std::lock_guard<std::mutex> lock(mutex_);
         return !detached_ && looper_->postTask(std::make_unique<Task>(
             this, std::bind(
               std::forward<Callable>(call), std::forward<Args>(args)...)));
@@ -333,7 +329,7 @@ namespace nul {
         const std::string &name, int64_t delayMs,
         Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          name, delayMs, -1,
+          name, delayMs, 0,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
@@ -355,27 +351,34 @@ namespace nul {
       }
 
       void remove(const std::string &name) {
+        std::lock_guard<std::mutex> lock(mutex_);
         if (!detached_) {
           looper_->removePendingTasks(this, name);
         }
       }
 
       void removeAllPendingTasks() {
+        std::lock_guard<std::mutex> lock(mutex_);
         if (!detached_) {
           looper_->removeAllPendingTasks(this);
         }
       }
 
       void detachFromLooper() {
-        // no strong synchronization is required, so lock is not needed here
-        detached_ = true;
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!detached_) {
+          looper_->removeAllPendingTasks(this);
+          detached_ = true;
+        }
       }
 
       std::string getName() const {
+        std::lock_guard<std::mutex> lock(mutex_);
         return !detached_ ? looper_->getName() : "";
       }
 
       bool isRunning() const {
+        std::lock_guard<std::mutex> lock(mutex_);
         return !detached_ && looper_->isRunning();
       }
 
@@ -398,12 +401,14 @@ namespace nul {
           std::bind(std::forward<Callable>(call), std::forward<Args>(args)...)
         );
 
+        std::lock_guard<std::mutex> lock(mutex_);
         return !detached_ && looper_->postTimedTask(std::move(timedTask));
       }
 
     private:
       std::shared_ptr<Looper> looper_;
-      bool detached_{false};
+      mutable std::mutex mutex_;
+      bool detached_{false};      // guarded by mutex_
   };
 
 } /* end of namespace: nul */
