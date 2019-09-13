@@ -162,7 +162,6 @@ namespace nul {
         auto inserted = false;
         auto it = delayedQ_.begin();
         while (it != delayedQ_.end()) {
-        auto &a = (*it)->triggerTimeMs;
           if (timedTask->triggerTimeMs < (*it)->triggerTimeMs) {
             delayedQ_.insert(it, std::move(timedTask));
             inserted = true;
@@ -311,7 +310,7 @@ namespace nul {
 
       template <typename Callable, typename ...Args>
       bool post(Callable &&call, Args &&...args) {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutexDetached_);
         return !detached_ && looper_->postTask(std::make_unique<Task>(
             this, std::bind(
               std::forward<Callable>(call), std::forward<Args>(args)...)));
@@ -351,21 +350,21 @@ namespace nul {
       }
 
       void remove(const std::string &name) {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutexDetached_);
         if (!detached_) {
           looper_->removePendingTasks(this, name);
         }
       }
 
       void removeAllPendingTasks() {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutexDetached_);
         if (!detached_) {
           looper_->removeAllPendingTasks(this);
         }
       }
 
       void detachFromLooper() {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutexDetached_);
         if (!detached_) {
           looper_->removeAllPendingTasks(this);
           detached_ = true;
@@ -373,12 +372,12 @@ namespace nul {
       }
 
       std::string getName() const {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutexDetached_);
         return !detached_ ? looper_->getName() : "";
       }
 
       bool isRunning() const {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutexDetached_);
         return !detached_ && looper_->isRunning();
       }
 
@@ -401,14 +400,14 @@ namespace nul {
           std::bind(std::forward<Callable>(call), std::forward<Args>(args)...)
         );
 
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutexDetached_);
         return !detached_ && looper_->postTimedTask(std::move(timedTask));
       }
 
     private:
       std::shared_ptr<Looper> looper_;
-      mutable std::mutex mutex_;
-      bool detached_{false};      // guarded by mutex_
+      mutable std::mutex mutexDetached_;
+      bool detached_{false};      // guarded by mutexDetached_
   };
 
 } /* end of namespace: nul */
