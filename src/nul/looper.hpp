@@ -69,18 +69,18 @@ namespace {
     public:
       TimedTask(
         void *marker,
-        const std::string &name,
+        int identity,
         int64_t triggerTimeUs,
         int64_t intervalUs,
         std::function<void()> &&call) :
         marker(marker),
-        name(name),
+        identity(identity),
         triggerTimeUs(triggerTimeUs),
         intervalUs(intervalUs),
         call(call) {}
 
       void *marker;
-      std::string name;
+      int identity; // a number to identify this task
       int64_t triggerTimeUs;
       int64_t intervalUs; // zero if no repeat
       std::function<void()> call;
@@ -179,13 +179,13 @@ namespace nul {
         return true;
       }
 
-      void removePendingTasks(void *marker, const std::string &name) {
+      void removePendingTasks(void *marker, int identity) {
         std::lock_guard<std::mutex> lock(mutex_);
 
         auto it = delayedQ_.begin();
         while (it != delayedQ_.end()) {
           auto &task = *it;
-          if (task->marker == marker && task->name == name) {
+          if (task->marker == marker && task->identity == identity) {
             it = delayedQ_.erase(it);
           } else {
             ++it;
@@ -321,16 +321,15 @@ namespace nul {
       template <typename Callable, typename ...Args>
       bool postDelayed(int64_t delayUs, Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          "", delayUs, 0,
+          0, delayUs, 0,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
-      bool postDelayed(
-        const std::string &name, int64_t delayUs,
-        Callable &&call, Args &&...args) {
+      bool postDelayedWithId(
+        int identity, int64_t delayUs, Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          name, delayUs, 0,
+          identity, delayUs, 0,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
@@ -338,23 +337,23 @@ namespace nul {
       bool postAtInterval(
         int64_t delayUs, int64_t intervalUs, Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          "", delayUs, intervalUs,
+          0, delayUs, intervalUs,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
-      bool postAtInterval(
-        const std::string &name, int64_t delayUs, int64_t intervalUs,
+      bool postAtIntervalWithId(
+        int identity, int64_t delayUs, int64_t intervalUs,
         Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          name, delayUs, intervalUs,
+          identity, delayUs, intervalUs,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
-      void remove(const std::string &name) {
+      void remove(int identity) {
         // no lock is needed here because looper_ itself is thread-safe
         if (!detached_) {
-          looper_->removePendingTasks(this, name);
+          looper_->removePendingTasks(this, identity);
         }
       }
 
@@ -382,7 +381,7 @@ namespace nul {
     private:
       template <typename Callable, typename ...Args>
       bool postAtIntervalInternal(
-        const std::string &name, int64_t delayUs, int64_t intervalUs,
+        int identity, int64_t delayUs, int64_t intervalUs,
         Callable &&call, Args &&...args) {
 
         if (delayUs < 0) {
@@ -394,7 +393,7 @@ namespace nul {
           system_clock::now().time_since_epoch()).count() + delayUs;
 
         auto timedTask = std::make_unique<TimedTask>(
-          this, name, triggerTimeUs, intervalUs,
+          this, identity, triggerTimeUs, intervalUs,
           std::bind(std::forward<Callable>(call), std::forward<Args>(args)...)
         );
 
