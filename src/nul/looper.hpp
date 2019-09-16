@@ -68,19 +68,19 @@ namespace {
       TimedTask(
         void *marker,
         const std::string &name,
-        int64_t triggerTimeMs,
-        int64_t intervalMs,
+        int64_t triggerTimeUs,
+        int64_t intervalUs,
         std::function<void()> &&call) :
         marker(marker),
         name(name),
-        triggerTimeMs(triggerTimeMs),
-        intervalMs(intervalMs),
+        triggerTimeUs(triggerTimeUs),
+        intervalUs(intervalUs),
         call(call) {}
 
       void *marker;
       std::string name;
-      int64_t triggerTimeMs;
-      int64_t intervalMs; // zero if no repeat
+      int64_t triggerTimeUs;
+      int64_t intervalUs; // zero if no repeat
       std::function<void()> call;
   };
 }
@@ -162,7 +162,7 @@ namespace nul {
         auto inserted = false;
         auto it = delayedQ_.begin();
         while (it != delayedQ_.end()) {
-          if (timedTask->triggerTimeMs < (*it)->triggerTimeMs) {
+          if (timedTask->triggerTimeUs < (*it)->triggerTimeUs) {
             delayedQ_.insert(it, std::move(timedTask));
             inserted = true;
             break;
@@ -231,18 +231,18 @@ namespace nul {
           }
 
           if (!delayedQ_.empty()) {
-            auto now = duration_cast<milliseconds>(
+            auto now = duration_cast<microseconds>(
               system_clock::now().time_since_epoch()).count();
             auto &timedTaskRef = delayedQ_.front();
-            if (now >= timedTaskRef->triggerTimeMs) {
+            if (now >= timedTaskRef->triggerTimeUs) {
               auto timedTask = std::move(delayedQ_.front());
               delayedQ_.pop_front();
               lock.unlock();
 
               timedTask->call();
 
-              if (timedTask->intervalMs > 0) {
-                timedTask->triggerTimeMs += timedTask->intervalMs;
+              if (timedTask->intervalUs > 0) {
+                timedTask->triggerTimeUs += timedTask->intervalUs;
                 postTimedTask(std::move(timedTask));
               }
               continue;
@@ -257,13 +257,13 @@ namespace nul {
             }
 
             if (!delayedQ_.empty()) {
-              auto triggerTimeMs = delayedQ_.front()->triggerTimeMs;
-              auto delay = triggerTimeMs - duration_cast<milliseconds>(
+              auto triggerTimeUs = delayedQ_.front()->triggerTimeUs;
+              auto delay = triggerTimeUs - duration_cast<microseconds>(
                 system_clock::now().time_since_epoch()).count();
               if (delay <= 0) {
                 continue;
               }
-              cond_.wait_for(lock, milliseconds(delay));
+              cond_.wait_for(lock, microseconds(delay));
 
             } else {
               cond_.wait(lock);
@@ -316,35 +316,35 @@ namespace nul {
       }
 
       template <typename Callable, typename ...Args>
-      bool postDelayed(int64_t delayMs, Callable &&call, Args &&...args) {
+      bool postDelayed(int64_t delayUs, Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          "", delayMs, 0,
+          "", delayUs, 0,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
       bool postDelayed(
-        const std::string &name, int64_t delayMs,
+        const std::string &name, int64_t delayUs,
         Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          name, delayMs, 0,
+          name, delayUs, 0,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
       bool postAtInterval(
-        int64_t delayMs, int64_t intervalMs, Callable &&call, Args &&...args) {
+        int64_t delayUs, int64_t intervalUs, Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          "", delayMs, intervalMs,
+          "", delayUs, intervalUs,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
       bool postAtInterval(
-        const std::string &name, int64_t delayMs, int64_t intervalMs,
+        const std::string &name, int64_t delayUs, int64_t intervalUs,
         Callable &&call, Args &&...args) {
         return postAtIntervalInternal(
-          name, delayMs, intervalMs,
+          name, delayUs, intervalUs,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
@@ -378,19 +378,19 @@ namespace nul {
     private:
       template <typename Callable, typename ...Args>
       bool postAtIntervalInternal(
-        const std::string &name, int64_t delayMs, int64_t intervalMs,
+        const std::string &name, int64_t delayUs, int64_t intervalUs,
         Callable &&call, Args &&...args) {
 
-        if (delayMs < 0) {
-          delayMs = 0;
+        if (delayUs < 0) {
+          delayUs = 0;
         }
 
         using namespace std::chrono;
-        auto triggerTimeMs = duration_cast<milliseconds>(
-          system_clock::now().time_since_epoch()).count() + delayMs;
+        auto triggerTimeUs = duration_cast<microseconds>(
+          system_clock::now().time_since_epoch()).count() + delayUs;
 
         auto timedTask = std::make_unique<TimedTask>(
-          this, name, triggerTimeMs, intervalMs,
+          this, name, triggerTimeUs, intervalUs,
           std::bind(std::forward<Callable>(call), std::forward<Args>(args)...)
         );
 
