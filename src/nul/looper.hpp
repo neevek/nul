@@ -16,6 +16,8 @@
 #include <chrono>
 #include <pthread.h>
 
+#include "spin_lock.hpp"
+
 #ifdef __ANDROID__
 #include <sys/prctl.h>
 #endif
@@ -310,6 +312,7 @@ namespace nul {
 
       template <typename Callable, typename ...Args>
       bool post(Callable &&call, Args &&...args) {
+        auto lock = SpinLock(busyFlag_);
         return !detached_ && looper_->postTask(std::make_unique<Task>(
             this, std::bind(
               std::forward<Callable>(call), std::forward<Args>(args)...)));
@@ -349,22 +352,23 @@ namespace nul {
       }
 
       void remove(const std::string &name) {
+        // no lock is needed here because looper_ itself is thread-safe
         if (!detached_) {
           looper_->removePendingTasks(this, name);
         }
       }
 
       void removeAllPendingTasks() {
+        // no lock is needed here because looper_ itself is thread-safe
         if (!detached_) {
           looper_->removeAllPendingTasks(this);
         }
       }
 
       void detachFromLooper() {
-        bool detached = false;
-        if (detached_.compare_exchange_weak(detached, true)) {
-          looper_->removeAllPendingTasks(this);
-        }
+        auto lock = SpinLock(busyFlag_);
+        detached_ = true;
+        looper_->removeAllPendingTasks(this);
       }
 
       std::string getName() const {
@@ -394,12 +398,14 @@ namespace nul {
           std::bind(std::forward<Callable>(call), std::forward<Args>(args)...)
         );
 
+        auto lock = SpinLock(busyFlag_);
         return !detached_ && looper_->postTimedTask(std::move(timedTask));
       }
 
     private:
       std::shared_ptr<Looper> looper_;
-      std::atomic_bool detached_{false};
+      bool detached_{false};
+      std::atomic_flag busyFlag_ = ATOMIC_FLAG_INIT;
   };
 
 } /* end of namespace: nul */
