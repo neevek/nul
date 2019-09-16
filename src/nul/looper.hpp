@@ -151,6 +151,7 @@ namespace nul {
           return false;
         }
         q_.push_back(std::move(task));
+
         cond_.notify_one();
         return true;
       }
@@ -175,7 +176,10 @@ namespace nul {
           delayedQ_.push_back(std::move(timedTask));
         }
 
-        cond_.notify_one();
+        // call notify_one only when task is inserted at the head of the queue
+        if (delayedQ_.size() == 1 || it == (delayedQ_.begin() + 1)) {
+          cond_.notify_one();
+        }
         return true;
       }
 
@@ -251,7 +255,7 @@ namespace nul {
             }
           }
 
-          if (running_ && q_.empty()) {
+          if (running_) {
             // if in gracefulStopping_ state, delayed tasks will be ignored
             if (gracefulStopping_) {
               running_ = false;
