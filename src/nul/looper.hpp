@@ -319,6 +319,9 @@ namespace nul {
       TaskQueue(const std::shared_ptr<Looper> &looper) : looper_(looper) {
         assert(!!looper);
       }
+      ~TaskQueue() {
+        detachFromLooper();
+      }
 
       template <typename Callable, typename ...Args>
       bool post(Callable &&call, Args &&...args) {
@@ -376,8 +379,31 @@ namespace nul {
 
       void detachFromLooper() {
         auto lock = SpinLock(busyFlag_);
+        if (!detached_) {
+          detached_ = true;
+          looper_->removeAllPendingTasks(this);
+        }
+      }
+
+      template <typename Callable, typename ...Args>
+      void detachFromLooper(Callable &&finalizer, Args &&...args) {
+        auto lock = SpinLock(busyFlag_);
+        if (detached_) {
+          return;
+        }
+
         detached_ = true;
+        // remove all pending tasks before posting the last task
         looper_->removeAllPendingTasks(this);
+
+        // give the caller a chance to run the last task, the caller can use
+        // this task to keep a reference (probably a shared_ptr from 
+        // shared_from_this()) to the caller itself to avoid the case that
+        // pending tasks access the caller object's raw pointer while the
+        // caller was already deallocated
+        looper_->postTask(std::make_unique<Task>(
+            this, std::bind(
+              std::forward<Callable>(finalizer), std::forward<Args>(args)...)));
       }
 
       std::string getName() const {
