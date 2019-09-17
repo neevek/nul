@@ -101,7 +101,7 @@ namespace nul {
         std::unique_lock<std::mutex> lock(mutex_);
         if (t_) {
           lock.unlock();
-          stop(true);
+          stop();
           t_->join();
         }
       }
@@ -126,11 +126,9 @@ namespace nul {
         }
       }
 
-      void stop(bool gracefulStop = false) {
+      void stop() {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (running_ && gracefulStop) {
-          gracefulStopping_ = true;
-        } else {
+        if (running_) {
           running_ = false;
         }
         cond_.notify_one();
@@ -148,7 +146,7 @@ namespace nul {
     private:
       bool postTask(std::unique_ptr<Task> task) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!running_ || gracefulStopping_) {
+        if (!running_) {
           return false;
         }
         q_.push_back(std::move(task));
@@ -159,14 +157,14 @@ namespace nul {
 
       bool postTimedTask(std::unique_ptr<TimedTask> timedTask) {
         std::lock_guard<std::mutex> lock(mutex_);
-        // check if the timedTask is a reposted task(runningRepeatedTimedTask_),
+        // check if the timedTask is a reposted task(activeRepeatedTimedTask_),
         // set it to null because it already finished running, setting it to
         // null here because the code must be run with the lock held
-        if (timedTask.get() == runningRepeatedTimedTask_) {
-          runningRepeatedTimedTask_ = nullptr;
+        if (timedTask.get() == activeRepeatedTimedTask_) {
+          activeRepeatedTimedTask_ = nullptr;
         }
 
-        if (!running_ || gracefulStopping_ || timedTask->isRemoved) {
+        if (!running_ || timedTask->isRemoved) {
           return false;
         }
 
@@ -204,10 +202,10 @@ namespace nul {
           }
         }
 
-        if (runningRepeatedTimedTask_ &&
-            runningRepeatedTimedTask_->marker == marker &&
-            runningRepeatedTimedTask_->identity == identity) {
-          runningRepeatedTimedTask_->isRemoved = true;
+        if (activeRepeatedTimedTask_ &&
+            activeRepeatedTimedTask_->marker == marker &&
+            activeRepeatedTimedTask_->identity == identity) {
+          activeRepeatedTimedTask_->isRemoved = true;
         }
       }
 
@@ -224,9 +222,9 @@ namespace nul {
           remove(delayedQ_, it2, marker);
         }
 
-        if (runningRepeatedTimedTask_ &&
-            runningRepeatedTimedTask_->marker == marker) {
-          runningRepeatedTimedTask_->isRemoved = true;
+        if (activeRepeatedTimedTask_ &&
+            activeRepeatedTimedTask_->marker == marker) {
+          activeRepeatedTimedTask_->isRemoved = true;
         }
       }
 
@@ -255,47 +253,32 @@ namespace nul {
             continue;
           }
 
-          if (!delayedQ_.empty()) {
-            auto now = duration_cast<microseconds>(
-              system_clock::now().time_since_epoch()).count();
-            auto &timedTaskRef = delayedQ_.front();
-            if (now >= timedTaskRef->triggerTimeUs) {
-              auto timedTask = std::move(delayedQ_.front());
-              delayedQ_.pop_front();
-              if (timedTask->intervalUs > 0) {
-                runningRepeatedTimedTask_ = timedTask.get();
-              }
-              lock.unlock();
-
-              timedTask->call();
-
-              if (timedTask->intervalUs > 0) {
-                timedTask->triggerTimeUs += timedTask->intervalUs;
-                postTimedTask(std::move(timedTask));
-              }
-              continue;
-            }
+          if (delayedQ_.empty()) {
+            cond_.wait(lock);
+            continue;
           }
 
-          if (running_) {
-            // if in gracefulStopping_ state, delayed tasks will be ignored
-            if (gracefulStopping_) {
-              running_ = false;
-              break;
-            }
+          auto now = duration_cast<microseconds>(
+            high_resolution_clock::now().time_since_epoch()).count();
+          auto delay = delayedQ_.front()->triggerTimeUs - now;
 
-            if (!delayedQ_.empty()) {
-              auto triggerTimeUs = delayedQ_.front()->triggerTimeUs;
-              auto delay = triggerTimeUs - duration_cast<microseconds>(
-                system_clock::now().time_since_epoch()).count();
-              if (delay <= 0) {
-                continue;
-              }
-              cond_.wait_for(lock, microseconds(delay));
+          if (delay > 0) {
+            cond_.wait_for(lock, microseconds(delay));
+            continue;
+          }
 
-            } else {
-              cond_.wait(lock);
-            }
+          auto timedTask = std::move(delayedQ_.front());
+          delayedQ_.pop_front();
+          if (timedTask->intervalUs > 0) {
+            activeRepeatedTimedTask_ = timedTask.get();
+          }
+          lock.unlock();
+
+          timedTask->call();
+
+          if (timedTask->intervalUs > 0) {
+            timedTask->triggerTimeUs += timedTask->intervalUs;
+            postTimedTask(std::move(timedTask));
           }
         }
       }
@@ -327,9 +310,8 @@ namespace nul {
 
       std::string name_;
       bool running_{false};           // guarded by mutex_
-      bool gracefulStopping_{false};  // guarded by mutex_
 
-      TimedTask *runningRepeatedTimedTask_{nullptr}; // guarded by mutex_
+      TimedTask *activeRepeatedTimedTask_{nullptr}; // guarded by mutex_
   };
 
   class TaskQueue final {
@@ -418,7 +400,7 @@ namespace nul {
 
         using namespace std::chrono;
         auto triggerTimeUs = duration_cast<microseconds>(
-          system_clock::now().time_since_epoch()).count() + delayUs;
+          high_resolution_clock::now().time_since_epoch()).count() + delayUs;
 
         auto timedTask = std::make_unique<TimedTask>(
           this, identity, triggerTimeUs, intervalUs,
