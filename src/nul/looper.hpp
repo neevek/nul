@@ -84,6 +84,7 @@ namespace {
       int64_t triggerTimeUs;
       int64_t intervalUs; // zero if no repeat
       std::function<void()> call;
+      bool isRemoved{false};
   };
 }
 
@@ -158,7 +159,14 @@ namespace nul {
 
       bool postTimedTask(std::unique_ptr<TimedTask> timedTask) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!running_ || gracefulStopping_) {
+        // check if the timedTask is a reposted task(runningRepeatedTimedTask_),
+        // set it to null because it already finished running, setting it to
+        // null here because the code must be run with the lock held
+        if (timedTask.get() == runningRepeatedTimedTask_) {
+          runningRepeatedTimedTask_ = nullptr;
+        }
+
+        if (!running_ || gracefulStopping_ || timedTask->isRemoved) {
           return false;
         }
 
@@ -195,6 +203,12 @@ namespace nul {
             ++it;
           }
         }
+
+        if (runningRepeatedTimedTask_ &&
+            runningRepeatedTimedTask_->marker == marker &&
+            runningRepeatedTimedTask_->identity == identity) {
+          runningRepeatedTimedTask_->isRemoved = true;
+        }
       }
 
       void removeAllPendingTasks(void *marker) {
@@ -208,6 +222,11 @@ namespace nul {
         auto it2 = delayedQ_.begin();
         while (it2 != delayedQ_.end()) {
           remove(delayedQ_, it2, marker);
+        }
+
+        if (runningRepeatedTimedTask_ &&
+            runningRepeatedTimedTask_->marker == marker) {
+          runningRepeatedTimedTask_->isRemoved = true;
         }
       }
 
@@ -243,6 +262,9 @@ namespace nul {
             if (now >= timedTaskRef->triggerTimeUs) {
               auto timedTask = std::move(delayedQ_.front());
               delayedQ_.pop_front();
+              if (timedTask->intervalUs > 0) {
+                runningRepeatedTimedTask_ = timedTask.get();
+              }
               lock.unlock();
 
               timedTask->call();
@@ -306,6 +328,8 @@ namespace nul {
       std::string name_;
       bool running_{false};           // guarded by mutex_
       bool gracefulStopping_{false};  // guarded by mutex_
+
+      TimedTask *runningRepeatedTimedTask_{nullptr}; // guarded by mutex_
   };
 
   class TaskQueue final {
