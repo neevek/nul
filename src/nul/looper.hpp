@@ -58,10 +58,11 @@ namespace std {
 namespace {
   class Task final {
     public:
-      Task(void *marker, std::function<void()> &&call) :
-        marker(marker), call(call) {}
+      Task(void *marker, int identity, std::function<void()> &&call) :
+        marker(marker), identity(identity), call(call) {}
 
       void *marker;
+      int identity; // a number to identify this task
       std::function<void()> call;
   };
 
@@ -192,15 +193,8 @@ namespace nul {
       void removePendingTasks(void *marker, int identity) {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        auto it = delayedQ_.begin();
-        while (it != delayedQ_.end()) {
-          auto &task = *it;
-          if (task->marker == marker && task->identity == identity) {
-            it = delayedQ_.erase(it);
-          } else {
-            ++it;
-          }
-        }
+        doRemoveTasks(q_, marker, identity);
+        doRemoveTasks(delayedQ_, marker, identity);
 
         if (activeRepeatedTimedTask_ &&
             activeRepeatedTimedTask_->marker == marker &&
@@ -212,15 +206,8 @@ namespace nul {
       void removeAllPendingTasks(void *marker) {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        auto it1 = q_.begin();
-        while (it1 != q_.end()) {
-          remove(q_, it1, marker);
-        }
-
-        auto it2 = delayedQ_.begin();
-        while (it2 != delayedQ_.end()) {
-          remove(delayedQ_, it2, marker);
-        }
+        doRemoveTasks(q_, marker, 0);
+        doRemoveTasks(delayedQ_, marker, 0);
 
         if (activeRepeatedTimedTask_ &&
             activeRepeatedTimedTask_->marker == marker) {
@@ -283,12 +270,16 @@ namespace nul {
         }
       }
 
-      template <typename Q, typename It>
-      void remove(Q &&q, It &&it, void *marker) {
-        if ((*it)->marker == marker) {
-          it = q.erase(it);
-        } else {
-          ++it;
+      template <typename Q>
+      void doRemoveTasks(Q &&q, void *marker, int identity) {
+        auto it = q.begin();
+        while (it != q.end()) {
+          if ((*it)->marker == marker &&
+              (identity == 0 || (*it)->identity == identity)) {
+            it = q.erase(it);
+          } else {
+            ++it;
+          }
         }
       }
 
@@ -319,15 +310,17 @@ namespace nul {
       TaskQueue(const std::shared_ptr<Looper> &looper) : looper_(looper) {
         assert(!!looper);
       }
-      ~TaskQueue() {
-        detachFromLooper();
-      }
 
       template <typename Callable, typename ...Args>
       bool post(Callable &&call, Args &&...args) {
+        return post(0, std::forward<Callable>(call), std::forward<Args>(args)...);
+      }
+
+      template <typename Callable, typename ...Args>
+      bool post(int identity, Callable &&call, Args &&...args) {
         auto lock = SpinLock(busyFlag_);
         return !detached_ && looper_->postTask(std::make_unique<Task>(
-            this, std::bind(
+            this, identity, std::bind(
               std::forward<Callable>(call), std::forward<Args>(args)...)));
       }
 
@@ -363,7 +356,7 @@ namespace nul {
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
-      void remove(int identity) {
+      void removePendingTasks(int identity) {
         // no lock is needed here because looper_ itself is thread-safe
         if (!detached_) {
           looper_->removePendingTasks(this, identity);
@@ -402,7 +395,7 @@ namespace nul {
         // pending tasks access the caller object's raw pointer while the
         // caller was already deallocated
         looper_->postTask(std::make_unique<Task>(
-            this, std::bind(
+            this, 0, std::bind(
               std::forward<Callable>(finalizer), std::forward<Args>(args)...)));
       }
 
@@ -420,6 +413,11 @@ namespace nul {
         int identity, int64_t delayUs, int64_t intervalUs,
         Callable &&call, Args &&...args) {
 
+        auto lock = SpinLock(busyFlag_);
+        if (detached_) {
+          return false;
+        }
+
         if (delayUs < 0) {
           delayUs = 0;
         }
@@ -433,8 +431,7 @@ namespace nul {
           std::bind(std::forward<Callable>(call), std::forward<Args>(args)...)
         );
 
-        auto lock = SpinLock(busyFlag_);
-        return !detached_ && looper_->postTimedTask(std::move(timedTask));
+        return looper_->postTimedTask(std::move(timedTask));
       }
 
     private:
