@@ -17,56 +17,24 @@
 #include <pthread.h>
 
 #include "spin_lock.hpp"
+#include "cpp11_compat.hpp"
 
 #ifdef __ANDROID__
 #include <sys/prctl.h>
 #endif
 
-#if __cplusplus == 201103L || (defined(_MSC_VER) && _MSC_VER == 1900)
-namespace std {
-  template<class T> struct _Unique_if {
-    typedef unique_ptr<T> _Single_object;
-  };
-
-  template<class T> struct _Unique_if<T[]> {
-    typedef unique_ptr<T[]> _Unknown_bound;
-  };
-
-  template<class T, size_t N> struct _Unique_if<T[N]> {
-    typedef void _Known_bound;
-  };
-
-  template<class T, class... Args>
-    typename _Unique_if<T>::_Single_object
-    make_unique(Args&&... args) {
-      return unique_ptr<T>(new T(std::forward<Args>(args)...));
-    }
-
-  template<class T>
-    typename _Unique_if<T>::_Unknown_bound
-    make_unique(size_t n) {
-      typedef typename remove_extent<T>::type U;
-      return unique_ptr<T>(new U[n]());
-    }
-
-  template<class T, class... Args>
-    typename _Unique_if<T>::_Known_bound
-    make_unique(Args&&...) = delete;
-}
-#endif
-
 namespace {
-  class Task final {
+  class Task {
     public:
       Task(void *marker, int identity, std::function<void()> &&call) :
-        marker(marker), identity(identity), call(call) {}
+        marker(marker), identity(identity), call(std::move(call)) {}
 
       void *marker;
-      int identity; // a number to identify this task
+      int identity; // a number to name this task, zero if unamed
       std::function<void()> call;
   };
 
-  class TimedTask final {
+  class TimedTask : public Task {
     public:
       TimedTask(
         void *marker,
@@ -74,17 +42,12 @@ namespace {
         int64_t triggerTimeUs,
         int64_t intervalUs,
         std::function<void()> &&call) :
-        marker(marker),
-        identity(identity),
+        Task(marker, identity, std::move(call)),
         triggerTimeUs(triggerTimeUs),
-        intervalUs(intervalUs),
-        call(call) {}
+        intervalUs(intervalUs) {}
 
-      void *marker;
-      int identity; // a number to identify this task
       int64_t triggerTimeUs;
       int64_t intervalUs; // zero if no repeat
-      std::function<void()> call;
       bool isRemoved{false};
   };
 }
@@ -190,11 +153,16 @@ namespace nul {
         return true;
       }
 
+      using RemoveTaskComparator = std::function<bool(const Task &task)>;
+
       void removePendingTasks(void *marker, int identity) {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        doRemoveTasks(q_, marker, identity);
-        doRemoveTasks(delayedQ_, marker, identity);
+        auto comp = [marker, identity](const Task &task){
+          return marker == task.marker && identity == task.identity;
+        };
+        doRemoveTasks(q_, comp);
+        doRemoveTasks(delayedQ_, comp);
 
         if (activeRepeatedTimedTask_ &&
             activeRepeatedTimedTask_->marker == marker &&
@@ -206,11 +174,37 @@ namespace nul {
       void removeAllPendingTasks(void *marker) {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        doRemoveTasks(q_, marker, 0);
-        doRemoveTasks(delayedQ_, marker, 0);
+        auto comp = [marker](const Task &task){
+          return marker == task.marker;
+        };
+        doRemoveTasks(q_, comp);
+        doRemoveTasks(delayedQ_, comp);
 
         if (activeRepeatedTimedTask_ &&
             activeRepeatedTimedTask_->marker == marker) {
+          activeRepeatedTimedTask_->isRemoved = true;
+        }
+      }
+
+      // remove all tasks that do not have identities
+      void removeAllUnamedPendingTasks(void *marker) {
+        removePendingTasks(marker, 0);
+      }
+
+      void removeAllNonRepeatedTasks(void *marker) {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        doRemoveTasks(q_, [marker](const Task &task){
+          return marker == task.marker;
+        });
+        doRemoveTasks(delayedQ_, [marker](const Task &task){
+          return marker == task.marker &&
+            static_cast<const TimedTask &>(task).intervalUs == 0;
+        });
+
+        if (activeRepeatedTimedTask_ &&
+            activeRepeatedTimedTask_->marker == marker &&
+            activeRepeatedTimedTask_->intervalUs == 0) {
           activeRepeatedTimedTask_->isRemoved = true;
         }
       }
@@ -271,11 +265,10 @@ namespace nul {
       }
 
       template <typename Q>
-      void doRemoveTasks(Q &&q, void *marker, int identity) {
+      void doRemoveTasks(Q &&q, const RemoveTaskComparator &comp) {
         auto it = q.begin();
         while (it != q.end()) {
-          if ((*it)->marker == marker &&
-              (identity == 0 || (*it)->identity == identity)) {
+          if (comp(**it)) {
             it = q.erase(it);
           } else {
             ++it;
@@ -326,7 +319,7 @@ namespace nul {
 
       template <typename Callable, typename ...Args>
       bool postDelayed(int64_t delayUs, Callable &&call, Args &&...args) {
-        return postAtIntervalInternal(
+        return postRepeatedInternal(
           0, delayUs, 0,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
@@ -334,24 +327,24 @@ namespace nul {
       template <typename Callable, typename ...Args>
       bool postDelayedWithId(
         int identity, int64_t delayUs, Callable &&call, Args &&...args) {
-        return postAtIntervalInternal(
+        return postRepeatedInternal(
           identity, delayUs, 0,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
-      bool postAtInterval(
+      bool postRepeated(
         int64_t delayUs, int64_t intervalUs, Callable &&call, Args &&...args) {
-        return postAtIntervalInternal(
+        return postRepeatedInternal(
           0, delayUs, intervalUs,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
       template <typename Callable, typename ...Args>
-      bool postAtIntervalWithId(
+      bool postRepeatedWithId(
         int identity, int64_t delayUs, int64_t intervalUs,
         Callable &&call, Args &&...args) {
-        return postAtIntervalInternal(
+        return postRepeatedInternal(
           identity, delayUs, intervalUs,
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
@@ -367,6 +360,20 @@ namespace nul {
         // no lock is needed here because looper_ itself is thread-safe
         if (!detached_) {
           looper_->removeAllPendingTasks(this);
+        }
+      }
+
+      // remove all tasks that do not have identities
+      void removeAllUnamedPendingTasks() {
+        // no lock is needed here because looper_ itself is thread-safe
+        if (!detached_) {
+          looper_->removeAllUnamedPendingTasks(this);
+        }
+      }
+
+      void removeAllNonRepeatedTasks() {
+        if (!detached_) {
+          looper_->removeAllNonRepeatedTasks(this);
         }
       }
 
@@ -409,7 +416,7 @@ namespace nul {
 
     private:
       template <typename Callable, typename ...Args>
-      bool postAtIntervalInternal(
+      bool postRepeatedInternal(
         int identity, int64_t delayUs, int64_t intervalUs,
         Callable &&call, Args &&...args) {
 
