@@ -121,14 +121,12 @@ namespace nul {
 
       bool postTimedTask(std::unique_ptr<TimedTask> timedTask) {
         std::lock_guard<std::mutex> lock(mutex_);
-        // check if the timedTask is a reposted task(activeRepeatedTimedTask_),
-        // set it to null because it already finished running, setting it to
-        // null here because the code must be run with the lock held
-        if (timedTask.get() == activeRepeatedTimedTask_) {
-          activeRepeatedTimedTask_ = nullptr;
-        }
+        return postTimedTaskLocked(std::move(timedTask));
+      }
 
-        if (!running_ || timedTask->isRemoved) {
+      // the main lock must be held when calling this function
+      bool postTimedTaskLocked(std::unique_ptr<TimedTask> timedTask) {
+        if (!running_) {
           return false;
         }
 
@@ -257,9 +255,11 @@ namespace nul {
 
           timedTask->call();
 
-          if (timedTask->intervalUs > 0) {
+          lock = std::unique_lock<std::mutex>(mutex_);
+          activeRepeatedTimedTask_ = nullptr;
+          if (timedTask->intervalUs > 0 && !timedTask->isRemoved) {
             timedTask->triggerTimeUs += timedTask->intervalUs;
-            postTimedTask(std::move(timedTask));
+            postTimedTaskLocked(std::move(timedTask));
           }
         }
       }
