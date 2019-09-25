@@ -29,18 +29,19 @@ extern "C" {
 #define LOG_LEVEL_ERROR 6
 #endif
 
-#ifdef LOG_LINE_INFO
+#ifdef HIDE_LINE_DETAIL
+#define FILENAME_INFO ""
+#define FUNCTION_INFO ""
+#else
+
 #if !defined(__FILENAME__)
-#define __FILENAME__\
-  (strrchr(__FILE__ ":", '/') ?\
-   strrchr(__FILE__ ":", '/') + 1 : __FILE__ ":")
+#define __FILENAME__ \
+  (strrchr(__FILE__, '/') ? \
+   strrchr(__FILE__, '/') + 1 : __FILE__)
 #endif
 
 #define FILENAME_INFO __FILENAME__
 #define FUNCTION_INFO __FUNCTION__
-#else
-#define FILENAME_INFO ""
-#define FUNCTION_INFO ""
 #endif
 
 inline char *log_strtime(char *buffer) {
@@ -71,7 +72,7 @@ inline static const char *log_prio_str_(int prio) {
 #define DO_LOG_(prio, color, fmt, ...) do { \
   FILE *f = fopen(LOG_FILE_PATH, "a+"); \
   char _LogTimeBuf_[TIME_BUFFER_SIZE];  \
-  fprintf(f, "%s %s [%s] [%s%d] %s - " fmt "\n", \
+  fprintf(f, "%s %s [%s] [%s:%d] %s - " fmt "\n", \
       log_strtime(_LogTimeBuf_), LOG_TAG_NAME, log_prio_str_(prio), \
       FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
   fclose(f); \
@@ -80,7 +81,7 @@ inline static const char *log_prio_str_(int prio) {
 // log to Android logcat
 #elif __ANDROID__
 #define DO_LOG_(prio, color, fmt, ...) do { \
-  __android_log_print(prio, LOG_TAG_NAME, "[%s%d] %s - " fmt "\n", \
+  __android_log_print(prio, LOG_TAG_NAME, "[%s:%d] %s - " fmt "\n", \
       FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
 } while (0)
 
@@ -174,3 +175,4 @@ inline static const char *log_prio_str_(int prio) {
 #endif
 
 #endif /* end of include guard: NUL_LOG_H_ */
+

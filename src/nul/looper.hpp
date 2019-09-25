@@ -255,11 +255,13 @@ namespace nul {
 
           timedTask->call();
 
-          lock = std::unique_lock<std::mutex>(mutex_);
-          activeRepeatedTimedTask_ = nullptr;
-          if (timedTask->intervalUs > 0 && !timedTask->isRemoved) {
-            timedTask->triggerTimeUs += timedTask->intervalUs;
-            postTimedTaskLocked(std::move(timedTask));
+          if (timedTask->intervalUs > 0) {
+            lock = std::unique_lock<std::mutex>(mutex_);
+            activeRepeatedTimedTask_ = nullptr;
+            if (!timedTask->isRemoved) {
+              timedTask->triggerTimeUs += timedTask->intervalUs;
+              postTimedTaskLocked(std::move(timedTask));
+            }
           }
         }
       }
@@ -309,6 +311,8 @@ namespace nul {
         return post(0, std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
+      // identity=0 means no name for this task, which will be deleted once
+      // removeAllUnamedPendingTasks() is called
       template <typename Callable, typename ...Args>
       bool post(int identity, Callable &&call, Args &&...args) {
         auto lock = SpinLock(busyFlag_);
@@ -324,6 +328,8 @@ namespace nul {
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
+      // identity=0 means no name for this task, which will be deleted once
+      // removeAllUnamedPendingTasks() is called
       template <typename Callable, typename ...Args>
       bool postDelayedWithId(
         int identity, int64_t delayUs, Callable &&call, Args &&...args) {
@@ -340,6 +346,8 @@ namespace nul {
           std::forward<Callable>(call), std::forward<Args>(args)...);
       }
 
+      // identity=0 means no name for this task, which will be deleted once
+      // removeAllUnamedPendingTasks() is called
       template <typename Callable, typename ...Args>
       bool postRepeatedWithId(
         int identity, int64_t delayUs, int64_t intervalUs,
