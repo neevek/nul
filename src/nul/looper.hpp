@@ -70,6 +70,15 @@ namespace nul {
         }
       }
 
+      static std::shared_ptr<Looper> defaultLooper() {
+        static auto looper = create("DefaultLooper");
+        static std::once_flag onceFlag;
+        std::call_once(onceFlag, [] {
+          looper->start();
+        });
+        return looper;
+      }
+
       static std::shared_ptr<Looper> create(const std::string &name = "") {
         return std::shared_ptr<Looper>(new Looper(name));
       }
