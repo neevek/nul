@@ -95,12 +95,14 @@ inline static const char *log_prio_str_(int prio) {
 #define KYEL  "\x1B[93m"
 #define KEND  KNRM
 #else
+#ifndef KNRM
 #define KNRM
 #define KBLU
 #define KRED
 #define KGRN
 #define KYEL
 #define KEND
+#endif
 #endif
 
 // log to stderr

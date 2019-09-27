@@ -1,5 +1,5 @@
 /*******************************************************************************
-**          File: Profiler.h
+**          File: profiler.hpp
 **        Author: neevek <i@neevek.net>.
 ** Creation Time: 2017-07-12
 **   Description: utility for profiling code running time
@@ -10,12 +10,55 @@
 #include <string>
 #include <cinttypes>
 #include <type_traits>
+#include <time.h>
+#include <sys/time.h>
 
-#include "log.hpp"
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
+#ifndef NO_TERM_COLOR
+#define NO_TERM_COLOR
+#define KNRM  "\x1B[0m"
+#define KBLU  "\x1b[34m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[92m"
+#define KYEL  "\x1B[93m"
+#define KEND  KNRM
+#else
+#ifndef KNRM
+#define KNRM
+#define KBLU
+#define KRED
+#define KGRN
+#define KYEL
+#define KEND
+#endif
+#endif
 
 #ifndef LOG_TAG_NAME
-#define LOG_TAG_NAME ""
+#define LOG_TAG_NAME "TIME_PROFILE"
 #endif
+
+#ifndef __FILENAME__
+#define __FILENAME__\
+  (strrchr(__FILE__, '/') ?\
+   strrchr(__FILE__, '/') + 1 : __FILE__)
+#endif
+
+namespace {
+  inline char *log_strtime(char *buffer, int buf_size) {
+    struct timeval now;
+    gettimeofday(&now, NULL);
+
+    size_t len = strftime(buffer, buf_size, "%Y-%m-%d %H:%M:%S.",
+                          localtime(&now.tv_sec));
+    int milli = now.tv_usec / 1000;
+    sprintf(buffer + len, "%03d", milli);
+
+    return buffer;
+  }
+}
 
 namespace nul {
 
@@ -34,81 +77,114 @@ namespace nul {
     static_assert(is_valid_time_unit<TimeUnit>::value, "Invalid TimeUnit");
 
     public:
-    Profiler(
-        const char *filename, const char *function_name,
-        int line_num, const char *fmt, ...) :
-      filename_(filename),
-      function_name_(function_name),
-      line_num_(line_num),
-      begin_time_(std::chrono::high_resolution_clock::now()) {
+      
 
-      va_list args;
-      va_start (args, fmt);
-      char buf[512];
-      vsnprintf(buf, 512, fmt, args);
-      va_end (args);
+    public:
+      Profiler(
+          const char *filename, const char *function_name, int line_num,
+          const char *fmt, ...) :
+        filename_(filename),
+        function_name_(function_name),
+        line_num_(line_num),
+        begin_time_(std::chrono::high_resolution_clock::now()) {
 
-      msg_.append(buf);
-    }
+        va_list args;
+        va_start (args, fmt);
+        char buf[512];
+        vsnprintf(buf, 512, fmt, args);
+        va_end (args);
 
-    ~Profiler() {
-      using namespace std::chrono;
+        msg_.append(buf);
+      }
 
-      auto duration = duration_cast<TimeUnit>(
-          high_resolution_clock::now() - begin_time_).count();
-      const char *unit_str = 
-        (std::is_same<TimeUnit, milliseconds>::value ? "ms" :
-        (std::is_same<TimeUnit, microseconds>::value ? "us" :
-        (std::is_same<TimeUnit, nanoseconds>::value  ? "ns" :
-        (std::is_same<TimeUnit, seconds>::value      ? "s"  :
-        (std::is_same<TimeUnit, minutes>::value      ? "m"  :
-        (std::is_same<TimeUnit, hours>::value        ? "h"  : ""))))));
+      void setLogThreshold(TimeUnit log_threshold) {
+        log_threshold_ = log_threshold;
+      }
+
+      void setLogToFilePath(const char *log_to_file_path) {
+        log_to_file_path_ = log_to_file_path;
+      }
+
+      ~Profiler() {
+        using namespace std::chrono;
+
+        auto now = high_resolution_clock::now();
+        auto dura = now - begin_time_;
+        if (dura < log_threshold_) {
+          return;
+        }
+
+        auto duration = duration_cast<TimeUnit>(dura).count();
+        const char *unit_str = 
+          (std::is_same<TimeUnit, milliseconds>::value ? "ms" :
+          (std::is_same<TimeUnit, microseconds>::value ? "us" :
+          (std::is_same<TimeUnit, nanoseconds>::value  ? "ns" :
+          (std::is_same<TimeUnit, seconds>::value      ? "s"  :
+          (std::is_same<TimeUnit, minutes>::value      ? "m"  :
+          (std::is_same<TimeUnit, hours>::value        ? "h"  : ""))))));
+
+        constexpr int timeBufSize = 24;
+
 #ifdef __ANDROID__
-      __android_log_print(ANDROID_LOG_INFO, LOG_TAG_NAME, "[%s:%d] %s - %s, time_cost: %lli %s\n",
-          filename_, line_num_, function_name_, msg_.c_str(), duration, unit_str);
+        __android_log_print(ANDROID_LOG_INFO, LOG_TAG_NAME, "[%s:%d] %s - %s (time: %lli %s)\n",
+            filename_, line_num_, function_name_, msg_.c_str(), duration, unit_str);
 #else
-      char buf[TIME_BUFFER_SIZE];
-      fprintf(stderr, KBLU "%s %s [I] [%s#%d] %s - %s, time_cost: " KEND KYEL "%lli" KEND KBLU " %s\n" KEND,
-          log_strtime(buf), LOG_TAG_NAME, filename_, line_num_,
-          function_name_, msg_.c_str(), duration, unit_str);
+        char timeBuf[timeBufSize];
+        fprintf(stderr, KBLU "%s %s [I] [%s#%d] %s - %s (time: " KEND KYEL "%lli" KEND KBLU " %s)\n" KEND,
+            log_strtime(timeBuf, timeBufSize), LOG_TAG_NAME, filename_, line_num_,
+            function_name_, msg_.c_str(), duration, unit_str);
 #endif
-    }
 
-  private:
-    std::string msg_;
-    const char *filename_{nullptr}; // must be string literal
-    const char *function_name_{nullptr}; // must be string literal
-    int line_num_{0};
-    std::chrono::high_resolution_clock::time_point begin_time_;
+        if (log_to_file_path_) {
+          FILE *f = fopen(log_to_file_path_, "a+");
+          char timeBuf[timeBufSize];
+          fprintf(f, "%s %s [I] [%s#%d] %s - %s (time: %lli %s)\n",
+              log_strtime(timeBuf, timeBufSize), LOG_TAG_NAME, filename_, line_num_,
+              function_name_, msg_.c_str(), duration, unit_str);
+          fclose(f);
+        }
+      }
+
+    private:
+      std::string msg_;
+      const char *filename_{nullptr}; // must be string literal
+      const char *function_name_{nullptr}; // must be string literal
+      int line_num_{0};
+      std::chrono::high_resolution_clock::time_point begin_time_;
+      TimeUnit log_threshold_{0};
+      const char *log_to_file_path_{nullptr}; // log to file if not null
   };
 
-  using TimeCostCalcMsec = Profiler<std::chrono::milliseconds>;
-  using TimeCostCalcUsec = Profiler<std::chrono::microseconds>;
-  using TimeCostCalcNsec = Profiler<std::chrono::nanoseconds>;
-  using TimeCostCalcHour = Profiler<std::chrono::hours>;
-  using TimeCostCalcMinute = Profiler<std::chrono::minutes>;
-  using TimeCostCalcSec = Profiler<std::chrono::seconds>;
+  using ProfilerMsec = Profiler<std::chrono::milliseconds>;
+  using ProfilerUsec = Profiler<std::chrono::microseconds>;
+  using ProfilerNsec = Profiler<std::chrono::nanoseconds>;
+  using ProfilerSec = Profiler<std::chrono::seconds>;
 } /* end of namespace: nul */
 
-#define EXPAND_(a, b) a ## b
-#define COMBINE_(a, b) EXPAND_(a, b)
-
-#ifdef ENABLE_PROFILING
-#define PROFILE_TIME_COST(time_unit, fmt, ...)\
-    nul::Profiler<time_unit> \
-    COMBINE_(__t, __LINE__) (__FILENAME__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
-#else
-#define PROFILE_TIME_COST(time_unit, fmt, ...)
-#endif
+#define PROFILE_TIME_COST(TimeUnit, log_threshold, log_to_file_path, fmt, ...)\
+    do { \
+      nul::Profiler<TimeUnit> \
+      profile(__FILENAME__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__); \
+      profile.setLogThreshold(TimeUnit(log_threshold)); \
+      profile.setLogToFilePath(log_to_file_path); \
+    } while (0)
 
 #define PROFILE_TIME_COST_USEC(fmt, ...)\
-    PROFILE_TIME_COST(std::chrono::microseconds, fmt, ##__VA_ARGS__)
+    PROFILE_TIME_COST(std::chrono::microseconds, 0, nullptr, fmt, ##__VA_ARGS__)
 
 #define PROFILE_TIME_COST_MSEC(fmt, ...)\
-    PROFILE_TIME_COST(std::chrono::milliseconds, fmt, ##__VA_ARGS__)
+    PROFILE_TIME_COST(std::chrono::milliseconds, 0, nullptr, fmt, ##__VA_ARGS__)
 
 #define PROFILE_TIME_COST_NSEC(fmt, ...)\
-    PROFILE_TIME_COST(std::chrono::nanoseconds, fmt, ##__VA_ARGS__)
+    PROFILE_TIME_COST(std::chrono::nanoseconds, 0, nullptr, fmt, ##__VA_ARGS__)
+
+#define PROFILE_TIME_USEC(log_threshold, log_to_file_path, fmt, ...)\
+    PROFILE_TIME_COST(std::chrono::microseconds, log_threshold, log_to_file_path, fmt, ##__VA_ARGS__)
+
+#define PROFILE_TIME_MSEC(log_threshold, log_to_file_path, fmt, ...)\
+    PROFILE_TIME_COST(std::chrono::milliseconds, log_threshold, log_to_file_path, fmt, ##__VA_ARGS__)
+
+#define PROFILE_TIME_NSEC(log_threshold, log_to_file_path, fmt, ...)\
+    PROFILE_TIME_COST(std::chrono::nanoseconds, log_threshold, log_to_file_path, fmt, ##__VA_ARGS__)
 
 #endif //PROFILER_H_
-
