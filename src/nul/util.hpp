@@ -47,7 +47,7 @@ namespace nul {
             break;
           }
         }
-        if (start == 0 && end == s.length() - 1) {
+        if (start == 0 && end == s.length()) {
           return s;
         }
         return s.substr(start, end - start);
