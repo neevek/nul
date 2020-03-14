@@ -11,8 +11,10 @@
 extern "C" {
 #endif
 
-#define MAX_FMT_SIZE 0xFF
 #define TIME_BUFFER_SIZE 24
+#ifndef LOG_TAG
+#define LOG_TAG "-"
+#endif
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -30,8 +32,8 @@ extern "C" {
 #endif
 
 #ifdef HIDE_LINE_DETAIL
-#define FILENAME_INFO ""
-#define FUNCTION_INFO ""
+#define FILENAME_INFO "?"
+#define FUNCTION_INFO "?"
 #else
 
 #if !defined(__FILENAME__)
@@ -73,7 +75,7 @@ inline static const char *log_prio_str_(int prio) {
   FILE *f = fopen(LOG_FILE_PATH, "a+"); \
   char _LogTimeBuf_[TIME_BUFFER_SIZE];  \
   fprintf(f, "%s %s [%s] [%s:%d] %s - " fmt "\n", \
-      log_strtime(_LogTimeBuf_), LOG_TAG_NAME, log_prio_str_(prio), \
+      log_strtime(_LogTimeBuf_), LOG_TAG, log_prio_str_(prio), \
       FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
   fclose(f); \
 } while (0)
@@ -81,18 +83,18 @@ inline static const char *log_prio_str_(int prio) {
 // log to Android logcat
 #elif __ANDROID__
 #define DO_LOG_(prio, color, fmt, ...) do { \
-  __android_log_print(prio, LOG_TAG_NAME, "[%s:%d] %s - " fmt "\n", \
+  __android_log_print(prio, LOG_TAG, "[%s:%d] %s - " fmt "\n", \
       FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
 } while (0)
 
 #else
 #ifndef NO_TERM_COLOR
 #define NO_TERM_COLOR
-#define KNRM  "\x1B[0m"
-#define KBLU  "\x1b[34m"
-#define KRED  "\x1B[31m"
-#define KGRN  "\x1B[92m"
-#define KYEL  "\x1B[93m"
+#define KNRM "\x1B[0m"
+#define KBLU "\x1b[34m"
+#define KRED "\x1B[31m"
+#define KGRN "\x1B[92m"
+#define KYEL "\x1B[93m"
 #define KEND  KNRM
 #else
 #ifndef KNRM
@@ -109,67 +111,53 @@ inline static const char *log_prio_str_(int prio) {
 #define DO_LOG_(prio, color, fmt, ...) do { \
   char _LogTimeBuf_[TIME_BUFFER_SIZE];  \
   fprintf(stderr, color "%s %s [%s] [%s:%d] %s - " fmt KEND "\n", \
-      log_strtime(_LogTimeBuf_), LOG_TAG_NAME, log_prio_str_(prio), FILENAME_INFO, \
+      log_strtime(_LogTimeBuf_), LOG_TAG, log_prio_str_(prio), FILENAME_INFO, \
       __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
 } while (0)
 #endif
 
-#if defined(LOG_VERBOSE)
-#define LOG_V(fmt, ...) DO_LOG_(LOG_LEVEL_VERBOSE, KNRM, fmt, ##__VA_ARGS__)
-#define LOG_DEBUG
-#define LOG_INFO
-#define LOG_WARN
-#define LOG_ERROR
-
+#if LOG_VERBOSE
 #define LOG_LEVEL LOG_LEVEL_VERBOSE
+#elif LOG_DEBUG
+#define LOG_LEVEL LOG_LEVEL_DEBUG
+#elif LOG_INFO
+#define LOG_LEVEL LOG_LEVEL_INFO
+#elif LOG_WARN
+#define LOG_LEVEL LOG_LEVEL_WARN
+#elif LOG_ERROR
+#define LOG_LEVEL LOG_LEVEL_ERROR
+#else
+#define LOG_LEVEL (LOG_LEVEL_ERROR+1)
+#endif
+
+#if LOG_LEVEL <= LOG_LEVEL_VERBOSE
+#define LOG_V(fmt, ...) DO_LOG_(LOG_LEVEL_VERBOSE, KNRM, fmt, ##__VA_ARGS__)
 #else
 #define LOG_V(fmt, ...)
 #endif
 
-#if defined(LOG_DEBUG)
-#define LOG_D(fmt, ...) DO_LOG_(LOG_LEVEL_DEBUG, KGRN, fmt, ##__VA_ARGS__)
-#define LOG_INFO
-#define LOG_WARN
-#define LOG_ERROR
-
-#undef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_VERBOSE
+#if LOG_LEVEL <= LOG_LEVEL_DEBUG
+#define LOG_D(fmt, ...) DO_LOG_(LOG_LEVEL_DEBUG, KBLU, fmt, ##__VA_ARGS__)
 #else
 #define LOG_D(fmt, ...)
 #endif
 
-#if defined(LOG_INFO)
-#define LOG_I(fmt, ...) DO_LOG_(LOG_LEVEL_INFO, KBLU, fmt, ##__VA_ARGS__)
-#define LOG_WARN
-#define LOG_ERROR
-
-#undef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_INFO
+#if LOG_LEVEL <= LOG_LEVEL_INFO
+#define LOG_I(fmt, ...) DO_LOG_(LOG_LEVEL_INFO, KGRN, fmt, ##__VA_ARGS__)
 #else
 #define LOG_I(fmt, ...)
 #endif
 
-#if defined(LOG_WARN)
+#if LOG_LEVEL <= LOG_LEVEL_WARN
 #define LOG_W(fmt, ...) DO_LOG_(LOG_LEVEL_WARN, KYEL, fmt, ##__VA_ARGS__)
-#define LOG_ERROR
-
-#undef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_WARN
 #else
 #define LOG_W(fmt, ...)
 #endif
 
-#if defined(LOG_ERROR)
+#if LOG_LEVEL <= LOG_LEVEL_ERROR
 #define LOG_E(fmt, ...) DO_LOG_(LOG_LEVEL_ERROR, KRED, fmt, ##__VA_ARGS__)
-
-#undef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_ERROR
 #else
 #define LOG_E(fmt, ...)
-#endif
-
-#ifndef LOG_LEVEL
-#define LOG_LEVEL 7
 #endif
 
 #ifdef __cplusplus
@@ -177,4 +165,3 @@ inline static const char *log_prio_str_(int prio) {
 #endif
 
 #endif /* end of include guard: NUL_LOG_H_ */
-
