@@ -8,7 +8,7 @@
 #ifndef XBUFFER_H_
 #define XBUFFER_H_
 #include "buffer.hpp"
-#include "log.hpp"
+#include "log.h"
 #include <memory>
 #include <string>
 #include <deque>

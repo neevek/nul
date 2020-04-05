@@ -7,7 +7,7 @@
 #ifndef NUL_URI_H_
 #define NUL_URI_H_
 #include <string>
-#include "log.hpp"
+#include "log.h"
 
 namespace nul {
   class URI final {

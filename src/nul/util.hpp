@@ -11,7 +11,7 @@
 #include <functional>
 #include <algorithm>
 #include <vector>
-#include "log.hpp"
+#include "log.h"
 
 namespace nul {
 
