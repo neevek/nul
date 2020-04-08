@@ -11,6 +11,12 @@
 extern "C" {
 #endif
 
+extern int gLogVerboseInDebugBuild;
+
+static void setLogVerboseInDebugBuild(int enable) {
+  gLogVerboseInDebugBuild = enable > 0 ? 1 : 0;
+}
+
 #define TIME_BUFFER_SIZE 24
 #ifndef LOG_TAG
 #define LOG_TAG "-"
@@ -31,22 +37,25 @@ extern "C" {
 #define LOG_LEVEL_ERROR 6
 #endif
 
-#ifdef HIDE_LINE_DETAIL
+#ifdef LOG_HIDE_FILENAME
 #define FILENAME_INFO "?"
-#define FUNCTION_INFO "?"
 #else
-
 #if !defined(__FILENAME__)
 #define __FILENAME__ \
   (strrchr(__FILE__, '/') ? \
    strrchr(__FILE__, '/') + 1 : __FILE__)
 #endif
-
 #define FILENAME_INFO __FILENAME__
+#endif
+
+#ifdef LOG_HIDE_FUNCTION_NAME
+#define FUNCTION_INFO "?"
+#else
 #define FUNCTION_INFO __FUNCTION__
 #endif
 
-inline char *log_strtime(char *buffer) {
+#ifndef __ANDROID__
+static char *doStrftime(char *buffer) {
   struct timeval now;
   gettimeofday(&now, NULL);
 
@@ -57,6 +66,7 @@ inline char *log_strtime(char *buffer) {
 
   return buffer;
 }
+#endif
 
 inline static const char *log_prio_str_(int prio) {
   switch(prio) {
@@ -73,9 +83,9 @@ inline static const char *log_prio_str_(int prio) {
 #if defined(LOG_TO_FILE) && defined(LOG_FILE_PATH)
 #define DO_LOG_(prio, color, fmt, ...) do { \
   FILE *f = fopen(LOG_FILE_PATH, "a+"); \
-  char _LogTimeBuf_[TIME_BUFFER_SIZE];  \
+  char buf[TIME_BUFFER_SIZE];  \
   fprintf(f, "%s %s [%s] [%s:%d] %s - " fmt "\n", \
-      log_strtime(_LogTimeBuf_), LOG_TAG, log_prio_str_(prio), \
+      doStrftime(buf), LOG_TAG, log_prio_str_(prio), \
       FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
   fclose(f); \
 } while (0)
@@ -109,12 +119,18 @@ inline static const char *log_prio_str_(int prio) {
 
 // log to stderr
 #define DO_LOG_(prio, color, fmt, ...) do { \
-  char _LogTimeBuf_[TIME_BUFFER_SIZE];  \
+  char buf[TIME_BUFFER_SIZE];  \
   fprintf(stderr, color "%s %s [%s] [%s:%d] %s - " fmt KEND "\n", \
-      log_strtime(_LogTimeBuf_), LOG_TAG, log_prio_str_(prio), FILENAME_INFO, \
+      doStrftime(buf), LOG_TAG, log_prio_str_(prio), FILENAME_INFO, \
       __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
 } while (0)
 #endif
+
+#define LOG_V_WITH_CONDITIONAL(fmt, ...) \
+  do { \
+    if (gLogVerboseInDebugBuild) \
+      DO_LOG_(LOG_LEVEL_VERBOSE, KNRM, fmt, ##__VA_ARGS__); \
+  } while(0)
 
 #if LOG_VERBOSE
 #define LOG_LEVEL LOG_LEVEL_VERBOSE
@@ -130,34 +146,51 @@ inline static const char *log_prio_str_(int prio) {
 #define LOG_LEVEL (LOG_LEVEL_ERROR+1)
 #endif
 
-#if LOG_LEVEL <= LOG_LEVEL_VERBOSE
+/* enable LOG_V if defined(DEBUG), and control output with runtime flag */
+#if LOG_LEVEL <= LOG_LEVEL_VERBOSE || defined(DEBUG)
+
+#if LOG_LEVEL > LOG_LEVEL_VERBOSE
+#define LOG_V(fmt, ...) LOG_V_WITH_CONDITIONAL(fmt, ##__VA_ARGS__)
+#else
 #define LOG_V(fmt, ...) DO_LOG_(LOG_LEVEL_VERBOSE, KNRM, fmt, ##__VA_ARGS__)
+#endif
+#define TLOG_V(extraTag, fmt, ...) LOG_V("[%s] " fmt, extraTag, ##__VA_ARGS__)
+
 #else
 #define LOG_V(fmt, ...)
+#define TLOG_V(extraTag, fmt, ...)
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_DEBUG
 #define LOG_D(fmt, ...) DO_LOG_(LOG_LEVEL_DEBUG, KBLU, fmt, ##__VA_ARGS__)
+#define TLOG_D(extraTag, fmt, ...) LOG_D("[%s] " fmt, extraTag, ##__VA_ARGS__)
 #else
 #define LOG_D(fmt, ...)
+#define TLOG_D(extraTag, fmt, ...)
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_INFO
 #define LOG_I(fmt, ...) DO_LOG_(LOG_LEVEL_INFO, KGRN, fmt, ##__VA_ARGS__)
+#define TLOG_I(extraTag, fmt, ...) LOG_I("[%s] " fmt, extraTag, ##__VA_ARGS__)
 #else
 #define LOG_I(fmt, ...)
+#define TLOG_I(extraTag, fmt, ...)
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_WARN
 #define LOG_W(fmt, ...) DO_LOG_(LOG_LEVEL_WARN, KYEL, fmt, ##__VA_ARGS__)
+#define TLOG_W(extraTag, fmt, ...) LOG_W("[%s] " fmt, extraTag, ##__VA_ARGS__)
 #else
 #define LOG_W(fmt, ...)
+#define TLOG_W(extraTag, fmt, ...)
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_ERROR
 #define LOG_E(fmt, ...) DO_LOG_(LOG_LEVEL_ERROR, KRED, fmt, ##__VA_ARGS__)
+#define TLOG_E(extraTag, fmt, ...) LOG_E("[%s] " fmt, extraTag, ##__VA_ARGS__)
 #else
 #define LOG_E(fmt, ...)
+#define TLOG_E(extraTag, fmt, ...)
 #endif
 
 #ifdef __cplusplus

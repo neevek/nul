@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "nul/circular_buffer.hpp"
-#include "nul/log.hpp"
+#include "nul/log.h"
 #include <future>
 #include <thread>
 #include <functional>
