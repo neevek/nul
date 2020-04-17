@@ -13,7 +13,7 @@ extern "C" {
 
 extern int gLogVerboseInDebugBuild;
 
-static void setLogVerboseInDebugBuild(int enable) {
+static inline void setLogVerboseInDebugBuild(int enable) {
   gLogVerboseInDebugBuild = enable > 0 ? 1 : 0;
 }
 
