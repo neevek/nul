@@ -2,13 +2,18 @@
 #define NUL_LOG_H_
 #include <stdio.h>
 #include <string.h>
-#include <stdarg.h>    // for va_list, va_start and va_end
 #include <time.h>
 #include <sys/time.h>
-#include <inttypes.h>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef GLOBAL_LOG_TAG
+#define GLOBAL_LOG_TAG "-"
 #endif
 
 extern int gLogVerboseInDebugBuild;
@@ -17,25 +22,27 @@ static inline void setLogVerboseInDebugBuild(int enable) {
   gLogVerboseInDebugBuild = enable > 0 ? 1 : 0;
 }
 
-#define TIME_BUFFER_SIZE 24
-#ifndef LOG_TAG
-#define LOG_TAG "-"
-#endif
+#define _TIME_BUFFER_SIZE 24
+static char *doStrftime_(char *buffer) {
+  struct timeval now;
+  gettimeofday(&now, NULL);
 
-#ifdef __ANDROID__
-#include <android/log.h>
-#define LOG_LEVEL_VERBOSE ANDROID_LOG_VERBOSE
-#define LOG_LEVEL_DEBUG ANDROID_LOG_DEBUG
-#define LOG_LEVEL_INFO ANDROID_LOG_INFO
-#define LOG_LEVEL_WARN ANDROID_LOG_WARN
-#define LOG_LEVEL_ERROR ANDROID_LOG_ERROR
-#else
-#define LOG_LEVEL_VERBOSE 2
-#define LOG_LEVEL_DEBUG 3
-#define LOG_LEVEL_INFO 4
-#define LOG_LEVEL_WARN 5
-#define LOG_LEVEL_ERROR 6
-#endif
+  size_t len = strftime(buffer, _TIME_BUFFER_SIZE, "%Y-%m-%d %H:%M:%S.",
+      localtime(&now.tv_sec));
+  int milli = now.tv_usec / 1000;
+  sprintf(buffer + len, "%03d", milli);
+
+  return buffer;
+}
+
+// Android uses the following enum values for log levels, but enums cannot be
+// used for comparison during preprocessing time, their values are hard coded
+// like so, see <android/log.h> for the enum declarations.
+#define LOG_LEVEL_VERBOSE   2
+#define LOG_LEVEL_DEBUG     3
+#define LOG_LEVEL_INFO      4
+#define LOG_LEVEL_WARN      5
+#define LOG_LEVEL_ERROR     6
 
 #ifdef LOG_HIDE_FILENAME
 #define FILENAME_INFO "?"
@@ -54,46 +61,32 @@ static inline void setLogVerboseInDebugBuild(int enable) {
 #define FUNCTION_INFO __FUNCTION__
 #endif
 
-#ifndef __ANDROID__
-static char *doStrftime(char *buffer) {
-  struct timeval now;
-  gettimeofday(&now, NULL);
-
-  size_t len = strftime(buffer, TIME_BUFFER_SIZE, "%Y-%m-%d %H:%M:%S.",
-      localtime(&now.tv_sec));
-  int milli = now.tv_usec / 1000;
-  sprintf(buffer + len, "%03d", milli);
-
-  return buffer;
-}
-#endif
-
-inline static const char *log_prio_str_(int prio) {
-  switch(prio) {
+inline static const char *logLevelStr_(int level) {
+  switch(level) {
     case LOG_LEVEL_VERBOSE: return "V";
     case LOG_LEVEL_DEBUG: return "D";
     case LOG_LEVEL_INFO: return "I";
     case LOG_LEVEL_WARN: return "W";
     case LOG_LEVEL_ERROR: return "E";
+    default: return "";
   }
-  return "";
 }
 
 // log to file
 #if defined(LOG_TO_FILE) && defined(LOG_FILE_PATH)
-#define DO_LOG_(prio, color, fmt, ...) do { \
+#define DO_LOG_(level, color, fmt, ...) do { \
   FILE *f = fopen(LOG_FILE_PATH, "a+"); \
-  char buf[TIME_BUFFER_SIZE];  \
+  char buf[_TIME_BUFFER_SIZE];  \
   fprintf(f, "%s %s [%s] [%s:%d] %s - " fmt "\n", \
-      doStrftime(buf), LOG_TAG, log_prio_str_(prio), \
+      doStrftime_(buf), GLOBAL_LOG_TAG, logLevelStr_(level), \
       FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
   fclose(f); \
 } while (0)
 
 // log to Android logcat
 #elif __ANDROID__
-#define DO_LOG_(prio, color, fmt, ...) do { \
-  __android_log_print(prio, LOG_TAG, "[%s:%d] %s - " fmt "\n", \
+#define DO_LOG_(level, color, fmt, ...) do { \
+  __android_log_print(level, GLOBAL_LOG_TAG, "[%s:%d] %s - " fmt "\n", \
       FILENAME_INFO, __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
 } while (0)
 
@@ -118,10 +111,10 @@ inline static const char *log_prio_str_(int prio) {
 #endif
 
 // log to stderr
-#define DO_LOG_(prio, color, fmt, ...) do { \
-  char buf[TIME_BUFFER_SIZE];  \
+#define DO_LOG_(level, color, fmt, ...) do { \
+  char buf[_TIME_BUFFER_SIZE];  \
   fprintf(stderr, color "%s %s [%s] [%s:%d] %s - " fmt KEND "\n", \
-      doStrftime(buf), LOG_TAG, log_prio_str_(prio), FILENAME_INFO, \
+      doStrftime_(buf), GLOBAL_LOG_TAG, logLevelStr_(level), FILENAME_INFO, \
       __LINE__, FUNCTION_INFO, ##__VA_ARGS__); \
 } while (0)
 #endif
@@ -132,6 +125,7 @@ inline static const char *log_prio_str_(int prio) {
       DO_LOG_(LOG_LEVEL_VERBOSE, KNRM, fmt, ##__VA_ARGS__); \
   } while(0)
 
+#ifndef LOG_LEVEL
 #if LOG_VERBOSE
 #define LOG_LEVEL LOG_LEVEL_VERBOSE
 #elif LOG_DEBUG
@@ -144,6 +138,7 @@ inline static const char *log_prio_str_(int prio) {
 #define LOG_LEVEL LOG_LEVEL_ERROR
 #else
 #define LOG_LEVEL (LOG_LEVEL_ERROR+1)
+#endif
 #endif
 
 /* enable LOG_V if defined(DEBUG), and control output with runtime flag */
