@@ -36,8 +36,8 @@
 #endif
 #endif
 
-#ifndef LOG_TAG_NAME
-#define LOG_TAG_NAME "TIME_PROFILE"
+#ifndef GLOBAL_LOG_TAG
+#define GLOBAL_LOG_TAG "TIME_PROFILE"
 #endif
 
 #ifndef __FILENAME__
@@ -126,12 +126,12 @@ namespace nul {
         constexpr int timeBufSize = 24;
 
 #ifdef __ANDROID__
-        __android_log_print(ANDROID_LOG_INFO, LOG_TAG_NAME, "[%s:%d] %s - %s (time: %lli %s)\n",
+        __android_log_print(ANDROID_LOG_INFO, GLOBAL_LOG_TAG, "[%s:%d] %s - %s (time: %lli %s)\n",
             filename_, line_num_, function_name_, msg_.c_str(), duration, unit_str);
 #else
         char timeBuf[timeBufSize];
         fprintf(stderr, KBLU "%s %s [I] [%s#%d] %s - %s (time: " KEND KYEL "%lli" KEND KBLU " %s)\n" KEND,
-            log_strtime(timeBuf, timeBufSize), LOG_TAG_NAME, filename_, line_num_,
+            log_strtime(timeBuf, timeBufSize), GLOBAL_LOG_TAG, filename_, line_num_,
             function_name_, msg_.c_str(), duration, unit_str);
 #endif
 
@@ -139,7 +139,7 @@ namespace nul {
           FILE *f = fopen(log_to_file_path_, "a+");
           char timeBuf[timeBufSize];
           fprintf(f, "%s %s [I] [%s#%d] %s - %s (time: %lli %s)\n",
-              log_strtime(timeBuf, timeBufSize), LOG_TAG_NAME, filename_, line_num_,
+              log_strtime(timeBuf, timeBufSize), GLOBAL_LOG_TAG, filename_, line_num_,
               function_name_, msg_.c_str(), duration, unit_str);
           fclose(f);
         }

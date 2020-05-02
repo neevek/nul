@@ -11,6 +11,7 @@
 #include <functional>
 #include <algorithm>
 #include <vector>
+#include <cinttypes>
 #include "log.h"
 
 namespace nul {
