@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <inttypes.h>
 #ifdef __ANDROID__
 #include <android/log.h>
 #endif
@@ -126,7 +127,7 @@ inline static const char *logLevelStr_(int level) {
   } while(0)
 
 #ifndef LOG_LEVEL
-#if LOG_VERBOSE
+#ifdef LOG_VERBOSE
 #define LOG_LEVEL LOG_LEVEL_VERBOSE
 #elif LOG_DEBUG
 #define LOG_LEVEL LOG_LEVEL_DEBUG
